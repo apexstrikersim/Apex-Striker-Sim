@@ -1,0 +1,24 @@
+Apex Striker Career - Privacy Policy
+
+Last updated: August 2026
+
+1. Overview
+Apex Striker Career ("we", "our", or "us") respects your privacy. This Privacy Policy explains how data is handled when you play Apex Striker Career.
+
+2. Information Collection & Usage
+Apex Striker Career is an offline, single-player game. We do NOT collect, store, transmit, or share any personal identifiable information (PII), telemetry, location data, device identifiers, contacts, or user analytics.
+
+3. Local Data Storage
+All game states, career records, save slots, and settings are saved locally on your device using Android's SQLite/Room database and SharedPreferences. No data ever leaves your device or is transmitted to external servers.
+
+4. Third-Party Services & SDKs
+Apex Striker Career does not integrate third-party advertising SDKs, tracking pixels, or data analytics services.
+
+5. Children's Privacy
+Our game is suitable for general audiences and does not knowingly collect any personal data from children or any other users.
+
+6. Changes to Privacy Policy
+We may update our Privacy Policy from time to time. Any changes will be reflected in updated versions of the game.
+
+7. Contact Us
+If you have any questions regarding this Privacy Policy, please consult the app settings or documentation.

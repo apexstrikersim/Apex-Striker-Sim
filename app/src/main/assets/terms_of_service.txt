@@ -1,0 +1,24 @@
+Apex Striker Career - Terms of Service
+
+Last updated: August 2026
+
+1. Acceptance of Terms
+By downloading, installing, or playing Apex Striker Career, you agree to be bound by these Terms of Service. If you do not agree to these terms, please do not use the application.
+
+2. Game Description
+Apex Striker Career is a single-player, text-based offline football player career simulation game. It allows users to simulate a career, train, transfer between clubs, and experience generational legacy gameplay.
+
+3. Local Save Data
+All progress, player statistics, match results, and save files are stored strictly locally on your Android device. There are no online user accounts, cloud servers, or multiplayer servers operated by the developers. Clearing app data or uninstalling the app will permanently erase your local save files.
+
+4. Fictional Content & Disclaimers
+All players, managers, club names, leagues, and events portrayed in Apex Striker Career are fictional or generated for gameplay purposes. Any resemblance to actual persons, living or dead, or real-world football clubs or entities is purely coincidental.
+
+5. Intellectual Property
+All code, graphics, user interface designs, and game assets associated with Apex Striker Career are the property of the game developers. You may not decompile, reverse engineer, or redistribute the application without prior authorization.
+
+6. Limitation of Liability
+The application is provided "AS IS" without warranty of any kind. The developers shall not be liable for any data loss, device performance issues, or damages arising out of the use or inability to use the app.
+
+7. Modifications to Terms
+We reserve the right to update these Terms of Service at any time. Continued use of the game constitutes acceptance of any revised terms.

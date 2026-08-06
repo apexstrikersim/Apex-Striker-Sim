@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Trophy Cup Pedestal / Base -->
+    <path
+        android:pathData="M38,76 L70,76 L66,70 L42,70 Z"
+        android:fillColor="#D97706" />
+    <path
+        android:pathData="M34,82 L74,82 L72,76 L36,76 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:startX="34"
+                android:startY="76"
+                android:endX="74"
+                android:endY="82"
+                android:type="linear">
+                <item android:color="#F59E0B" android:offset="0.0" />
+                <item android:color="#B45309" android:offset="1.0" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Trophy Stem -->
+    <path
+        android:pathData="M48,60 L60,60 L58,70 L50,70 Z"
+        android:fillColor="#FBBF24" />
+
+    <!-- Trophy Handles (Left & Right) -->
+    <path
+        android:pathData="M36,36 C24,36 24,52 38,56 L38,50 C29,48 29,40 36,40 Z"
+        android:fillColor="#F59E0B" />
+    <path
+        android:pathData="M72,36 C84,36 84,52 70,56 L70,50 C79,48 79,40 72,40 Z"
+        android:fillColor="#F59E0B" />
+
+    <!-- Main Trophy Cup Body -->
+    <path
+        android:pathData="M34,30 L74,30 C74,30 72,58 54,60 C36,58 34,30 34,30 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:startX="34"
+                android:startY="30"
+                android:endX="74"
+                android:endY="60"
+                android:type="linear">
+                <item android:color="#FDE047" android:offset="0.0" />
+                <item android:color="#F59E0B" android:offset="0.6" />
+                <item android:color="#D97706" android:offset="1.0" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Trophy Cup Rim Top -->
+    <path
+        android:pathData="M32,28 L76,28 C76,28 76,32 74,32 L34,32 C32,32 32,28 32,28 Z"
+        android:fillColor="#FEF08A" />
+
+    <!-- Center Soccer Ball / Star Emblem on Cup -->
+    <path
+        android:pathData="M54,38 L56.5,43 L62,43.8 L58,47.7 L59,53 L54,50.3 L49,53 L50,47.7 L46,43.8 L51.5,43 Z"
+        android:fillColor="#FFFFFF" />
+
+    <!-- High-shine Reflection Highlight on Cup Left -->
+    <path
+        android:pathData="M38,32 L44,32 C42,46 46,52 50,56 C42,52 38,44 38,32 Z"
+        android:fillColor="#30FFFFFF" />
+</vector>
