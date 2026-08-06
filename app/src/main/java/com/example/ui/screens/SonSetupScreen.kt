@@ -10,6 +10,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
@@ -24,6 +26,8 @@ import com.example.ui.theme.*
 @Composable
 fun SonSetupScreen(viewModel: CareerViewModel, father: PlayerEntity?) {
     if (father == null) return
+    val keyboardController = LocalSoftwareKeyboardController.current
+    val focusManager = LocalFocusManager.current
     var sonName by remember { mutableStateOf("") }
 
     Box(
@@ -94,6 +98,8 @@ fun SonSetupScreen(viewModel: CareerViewModel, father: PlayerEntity?) {
                 Button(
                     onClick = {
                         if (sonName.isNotBlank()) {
+                            keyboardController?.hide()
+                            focusManager.clearFocus()
                             viewModel.createSon(sonName.trim())
                         }
                     },

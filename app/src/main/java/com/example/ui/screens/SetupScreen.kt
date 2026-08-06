@@ -25,6 +25,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -41,6 +43,9 @@ import com.example.ui.theme.*
 
 @Composable
 fun SetupScreen(viewModel: CareerViewModel) {
+    val keyboardController = LocalSoftwareKeyboardController.current
+    val focusManager = LocalFocusManager.current
+
     var name by remember { mutableStateOf("") }
     var selectedBirthCountry by remember { mutableStateOf("England") }
     var preferredFoot by remember { mutableStateOf("Right") }
@@ -81,7 +86,11 @@ fun SetupScreen(viewModel: CareerViewModel) {
             verticalAlignment = Alignment.CenterVertically
         ) {
             IconButton(
-                onClick = { viewModel.returnToMainMenu() },
+                onClick = {
+                    keyboardController?.hide()
+                    focusManager.clearFocus()
+                    viewModel.returnToMainMenu()
+                },
                 modifier = Modifier.size(40.dp)
             ) {
                 Icon(
@@ -482,6 +491,8 @@ fun SetupScreen(viewModel: CareerViewModel) {
         Button(
             onClick = {
                 if (name.isNotBlank()) {
+                    keyboardController?.hide()
+                    focusManager.clearFocus()
                     viewModel.createCharacter(
                         name = name.trim(),
                         birth = selectedBirthCountry,

@@ -27,8 +27,7 @@ object WhistlePlayer {
                 .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
                 .build()
 
-            mediaPlayer = MediaPlayer.create(context, resId)?.apply {
-                setAudioAttributes(attrs)
+            mediaPlayer = MediaPlayer.create(context, resId, attrs, 0)?.apply {
                 setVolume(volume, volume)
                 setOnCompletionListener { player ->
                     player.release()

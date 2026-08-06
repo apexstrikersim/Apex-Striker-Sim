@@ -16,6 +16,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -33,6 +35,9 @@ import kotlinx.coroutines.delay
 
 @Composable
 fun SettingsDialog(viewModel: CareerViewModel, gameState: GameStateEntity?) {
+    val keyboardController = LocalSoftwareKeyboardController.current
+    val focusManager = LocalFocusManager.current
+
     var clickCount by remember { mutableStateOf(0) }
     var showDevTools by remember(gameState?.isDevMode) { mutableStateOf(gameState?.isDevMode ?: false) }
     var showPinPrompt by remember { mutableStateOf(false) }
@@ -66,7 +71,11 @@ fun SettingsDialog(viewModel: CareerViewModel, gameState: GameStateEntity?) {
 
     var simSeasonsSlider by remember(isGodModeActive) { mutableFloatStateOf(if (isGodModeActive) 10f else 1f) }
 
-    Dialog(onDismissRequest = { viewModel.showSettings(false) }) {
+    Dialog(onDismissRequest = {
+        keyboardController?.hide()
+        focusManager.clearFocus()
+        viewModel.showSettings(false)
+    }) {
         Card(
             colors = CardDefaults.cardColors(containerColor = SportsCardBg),
             shape = RoundedCornerShape(20.dp),
@@ -762,6 +771,8 @@ fun SettingsDialog(viewModel: CareerViewModel, gameState: GameStateEntity?) {
     if (showPinPrompt) {
         AlertDialog(
             onDismissRequest = {
+                keyboardController?.hide()
+                focusManager.clearFocus()
                 showPinPrompt = false
                 clickCount = 0
                 pinInput = ""
