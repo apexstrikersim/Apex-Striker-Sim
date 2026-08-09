@@ -2,6 +2,7 @@ package com.example.data
 
 import android.content.Context
 import androidx.room.withTransaction
+import kotlinx.coroutines.yield
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -756,8 +757,9 @@ class CareerRepository(private val context: Context, val slotId: Int = 1) {
     private suspend fun resetYouthLeagueForNewSeason() {
         dao.clearYouthFixtures()
         val allAcademies = dao.getAllYouthAcademiesSync()
+        dao.clearYouthStandings()
         val resetStandings = allAcademies.map { YouthStandingEntity(academyId = it.id) }
-        dao.updateYouthStandings(resetStandings)
+        dao.insertYouthStandings(resetStandings)
         val newYouthFixtures = YouthCareerLogic.generateYouthFixtures(allAcademies)
         dao.insertYouthFixtures(newYouthFixtures)
     }
@@ -2925,22 +2927,26 @@ private suspend fun adjustClubsReputations(standings: List<StandingEntity>, club
         var currentSeason = startSeason
         var safetyCounter = 0
 
-        while (currentSeason == startSeason && safetyCounter < 15) {
+        while (currentSeason == startSeason && safetyCounter < 40) {
             safetyCounter++
             val player = dao.getPlayerSync() ?: break
             if (player.isRetired || (player.age >= 41 && !player.isGodMode)) break
 
-            val gs = dao.getGameStateSync() ?: break
-            gs.activeChoicePrompt = null
-            dao.updateGameState(gs)
+            var gs = dao.getGameStateSync() ?: break
+            var resolveAttempts = 0
+            while (gs.activeChoicePrompt != null && resolveAttempts < 5) {
+                resolveChoice(1)
+                gs = dao.getGameStateSync() ?: break
+                resolveAttempts++
+            }
 
             if (player.careerPhase == PHASE_STREET) {
-                val offers = YouthCareerLogic.deserializeYouthOffers(gs.persistedYouthOffers ?: "")
+                val offers = YouthCareerLogic.deserializeYouthOffers(gs?.persistedYouthOffers ?: "")
                 if (offers.isNotEmpty()) {
                     acceptYouthScoutOffer(offers.first().academyId)
                 }
             } else if (player.careerPhase == PHASE_YOUTH && player.age >= 16) {
-                val offers = YouthCareerLogic.deserializeSeniorYouthOffers(gs.persistedSeniorYouthOffers ?: "")
+                val offers = YouthCareerLogic.deserializeSeniorYouthOffers(gs?.persistedSeniorYouthOffers ?: "")
                 if (offers.isNotEmpty()) {
                     val offer = offers.first()
                     acceptSeniorYouthOffer(offer.clubId, offer.contractYears, offer.targetGplusA)
@@ -2948,6 +2954,7 @@ private suspend fun adjustClubsReputations(standings: List<StandingEntity>, club
             }
 
             legacy_advanceMonth(isAutoSim = true)
+            yield()
 
             val updatedGs = dao.getGameStateSync() ?: break
             currentSeason = updatedGs.currentSeason
@@ -5096,9 +5103,23 @@ private suspend fun adjustClubsReputations(standings: List<StandingEntity>, club
                         PHASE_YOUTH -> {
                             val (name, handle, init) = punditAuthors[rng.nextInt(punditAuthors.size)]
                             val youthContent = when {
-                                form >= 3 -> "⚡ ${player.name} on fire! Youth PL Player of the Month nominee."
-                                form <= -3 -> "${player.name} benched — academy coaches demand answers."
-                                else -> "${player.name} holding down a starting spot in U18s."
+                                form >= 3 -> listOf(
+                                    "⚡ ${player.name} on fire! Youth PL Player of the Month nominee.",
+                                    "${player.name} is the standout name in the U18s right now — scouts are noticing.",
+                                    "Can't stop, won't stop: ${player.name} is tearing up the youth league this month."
+                                ).random(rng)
+                                form <= -3 -> listOf(
+                                    "${player.name} benched — academy coaches demand answers.",
+                                    "Rough patch for ${player.name}, who's lost his place in the U18s starting XI.",
+                                    "Whispers from the academy: is ${player.name} losing his edge?"
+                                ).random(rng)
+                                else -> listOf(
+                                    "${player.name} holding down a starting spot in U18s.",
+                                    "Steady week for ${player.name} in the academy setup — no fireworks, no drama.",
+                                    "${player.name} putting in the reps at U18 level, building toward a breakthrough.",
+                                    "Academy report: ${player.name} remains a fixture in the U18s XI.",
+                                    "Nothing flashy, just consistent minutes for ${player.name} in the youth ranks."
+                                ).random(rng)
                             }
                             SocialPostEntity(
                                 sequenceIndex = currentSeq,

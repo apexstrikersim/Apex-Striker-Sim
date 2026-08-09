@@ -157,10 +157,10 @@ Keyboard shortcuts / device: the game is fully touch-composed (Jetpack Compose).
 | **Language** | Kotlin |
 | **UI** | Jetpack Compose (Material 3) |
 | **Data** | Room (SQLite) + StateFlow + DataStore/SharedPreferences |
-| **App ID** | `com.aistudio.footballcareersim.rkypws` |
+| **App ID** | `com.apexstrikersim.career` |
 | **Min SDK** | 24 |
 | **Target SDK** | 36 |
-| **Version** | `2.3.3` (codeVersion 9) |
+| **Version** | `2.4.0 (codeVersion 10)` |
 
 ### Project layout (relevant parts)
 ```

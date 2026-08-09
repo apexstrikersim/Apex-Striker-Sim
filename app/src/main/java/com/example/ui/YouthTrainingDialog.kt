@@ -49,8 +49,10 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.unit.IntOffset
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -851,6 +853,18 @@ fun PaceDrillCanvas(onComplete: (Float) -> Unit) {
 
 data class TechnicalObstacle(val id: Int, var x: Float, var y: Float, val speed: Float)
 
+@Composable
+private fun BoxScope.TimerText(survivedSecondsProvider: () -> Float) {
+    Text(
+        text = "Dodge red obstacles! Time: ${String.format("%.1f", survivedSecondsProvider())}s / 15.0s",
+        fontSize = 12.sp,
+        color = GoldStar,
+        modifier = Modifier
+            .align(Alignment.TopCenter)
+            .padding(12.dp)
+    )
+}
+
 // 4. Technical Drill Canvas
 @Composable
 fun TechnicalDrillCanvas(onComplete: (Float) -> Unit) {
@@ -858,7 +872,8 @@ fun TechnicalDrillCanvas(onComplete: (Float) -> Unit) {
     var lost by remember { mutableStateOf(false) }
     var ballPos by remember { mutableStateOf(Offset(200f, 450f)) }
 
-    val obstacles = remember { mutableStateListOf<TechnicalObstacle>() }
+    val obstacles = remember { mutableListOf<TechnicalObstacle>() }
+    var frameTick by remember { mutableLongStateOf(0L) }
     var obstacleIdCounter by remember { mutableIntStateOf(0) }
     var lastSpawnTime by remember { mutableFloatStateOf(0f) }
     var canvasSize by remember { mutableStateOf(Size.Zero) }
@@ -872,6 +887,7 @@ fun TechnicalDrillCanvas(onComplete: (Float) -> Unit) {
                     val deltaSeconds = (frameTimeNanos - lastFrameTimeNanos) / 1_000_000_000f
                     lastFrameTimeNanos = frameTimeNanos
                     survivedSeconds += deltaSeconds
+                    frameTick = frameTimeNanos
 
                     if (survivedSeconds - lastSpawnTime >= 0.8f) {
                         lastSpawnTime = survivedSeconds
@@ -913,15 +929,30 @@ fun TechnicalDrillCanvas(onComplete: (Float) -> Unit) {
             .fillMaxSize()
             .pointerInput(lost, canvasSize) {
                 if (lost) return@pointerInput
+                var dragValid = false
                 detectDragGestures(
+                    onDragStart = { offset ->
+                        dragValid = hypot(offset.x - ballPos.x, offset.y - ballPos.y) < 90f
+                    },
                     onDrag = { change, _ ->
+                        if (!dragValid) return@detectDragGestures
                         val w = if (canvasSize.width > 0) canvasSize.width else 360f
                         val h = if (canvasSize.height > 0) canvasSize.height else 600f
-                        ballPos = Offset(
+                        val target = Offset(
                             change.position.x.coerceIn(18f, w - 18f),
                             change.position.y.coerceIn(18f, h - 18f)
                         )
-                    }
+                        val maxStep = 60f
+                        val delta = target - ballPos
+                        val dist = hypot(delta.x, delta.y)
+                        ballPos = if (dist > maxStep) {
+                            ballPos + delta * (maxStep / dist)
+                        } else {
+                            target
+                        }
+                    },
+                    onDragEnd = { dragValid = false },
+                    onDragCancel = { dragValid = false }
                 )
             }
     ) {
@@ -929,6 +960,8 @@ fun TechnicalDrillCanvas(onComplete: (Float) -> Unit) {
             if (canvasSize != size) {
                 canvasSize = size
             }
+            @Suppress("UNUSED_VARIABLE")
+            val tick = frameTick
             // Draw obstacles
             for (obs in obstacles) {
                 drawCircle(color = CoralRed, radius = 22f, center = Offset(obs.x, obs.y))
@@ -938,14 +971,7 @@ fun TechnicalDrillCanvas(onComplete: (Float) -> Unit) {
             drawCircle(color = GoldStar, radius = 18f, center = ballPos)
         }
 
-        Text(
-            text = "Dodge red obstacles! Time: ${String.format("%.1f", survivedSeconds)}s / 15.0s",
-            fontSize = 12.sp,
-            color = GoldStar,
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .padding(12.dp)
-        )
+        TimerText(survivedSecondsProvider = { survivedSeconds })
     }
 }
 
