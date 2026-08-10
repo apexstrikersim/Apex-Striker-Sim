@@ -1,5 +1,7 @@
 package com.example.ui
 
+import com.example.ui.components.ClubCrestIcon
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
@@ -109,35 +111,11 @@ fun ClubProfileDialog(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Club Initials Crest
-                    val initials = remember(club.name) {
-                        club.name.split(" ")
-                            .take(2)
-                            .map { it.firstOrNull() ?: "" }
-                            .joinToString("")
-                            .uppercase()
-                    }
-
-                    Box(
-                        modifier = Modifier
-                            .size(72.dp)
-                            .clip(CircleShape)
-                            .background(
-                                Brush.verticalGradient(
-                                    listOf(SportsCardBg, DarkSlate)
-                                )
-                            )
-                            .border(2.dp, PitchGreen, CircleShape),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = initials,
-                            fontSize = 24.sp,
-                            fontWeight = FontWeight.Black,
-                            color = PitchGreen,
-                            letterSpacing = 1.sp
-                        )
-                    }
+                    ClubCrestIcon(
+                        clubId = club.id,
+                        clubName = club.name,
+                        size = 72.dp
+                    )
 
                     Spacer(modifier = Modifier.width(16.dp))
 

@@ -1,5 +1,7 @@
 package com.example.ui
 
+import com.example.ui.components.ClubCrestIcon
+
 import androidx.compose.animation.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
@@ -211,21 +213,11 @@ fun PreMatchScreen(
                 ) {
                     // Home
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Box(
-                            modifier = Modifier
-                                .size(64.dp)
-                                .clip(CircleShape)
-                                .background(DarkSlate)
-                                .border(2.dp, PitchGreen, CircleShape),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = myClub.name.take(2).uppercase(),
-                                fontSize = 24.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = TrophyGold
-                            )
-                        }
+                        ClubCrestIcon(
+                            clubId = myClub.id,
+                            clubName = myClub.name,
+                            size = 64.dp
+                        )
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
                             text = myClub.name,
@@ -252,20 +244,11 @@ fun PreMatchScreen(
 
                     // Away
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Box(
-                            modifier = Modifier
-                                .size(64.dp)
-                                .clip(CircleShape)
-                                .background(DarkSlate),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = oppClub.name.take(2).uppercase(),
-                                fontSize = 24.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = TextSecondary
-                            )
-                        }
+                        ClubCrestIcon(
+                            clubId = oppClub.id,
+                            clubName = oppClub.name,
+                            size = 64.dp
+                        )
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
                             text = oppClub.name,

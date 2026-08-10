@@ -1,5 +1,7 @@
 package com.example.ui
 
+import com.example.ui.components.ClubCrestIcon
+
 import com.example.ui.theme.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -138,13 +140,23 @@ fun YouthScoutOfferDialog(
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Text(
-                                    text = currentOffer.academyName,
-                                    fontSize = 17.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color.White,
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
                                     modifier = Modifier.weight(1f)
-                                )
+                                ) {
+                                    ClubCrestIcon(
+                                        clubId = currentOffer.academyId,
+                                        clubName = currentOffer.academyName,
+                                        size = 36.dp
+                                    )
+                                    Spacer(modifier = Modifier.width(10.dp))
+                                    Text(
+                                        text = currentOffer.academyName,
+                                        fontSize = 17.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color.White
+                                    )
+                                }
 
                                 Box(
                                     modifier = Modifier
@@ -370,13 +382,23 @@ fun SeniorScoutOfferDialog(
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Text(
-                                    text = currentOffer.clubName,
-                                    fontSize = 17.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color.White,
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
                                     modifier = Modifier.weight(1f)
-                                )
+                                ) {
+                                    ClubCrestIcon(
+                                        clubId = currentOffer.clubId,
+                                        clubName = currentOffer.clubName,
+                                        size = 36.dp
+                                    )
+                                    Spacer(modifier = Modifier.width(10.dp))
+                                    Text(
+                                        text = currentOffer.clubName,
+                                        fontSize = 17.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color.White
+                                    )
+                                }
 
                                 Box(
                                     modifier = Modifier

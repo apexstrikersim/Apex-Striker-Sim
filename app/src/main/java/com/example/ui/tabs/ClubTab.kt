@@ -1,5 +1,7 @@
 package com.example.ui.tabs
 
+import com.example.ui.components.ClubCrestIcon
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
@@ -78,21 +80,11 @@ fun ClubTab(viewModel: CareerViewModel, player: PlayerEntity, club: ClubEntity?)
                     modifier = Modifier.padding(16.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .size(56.dp)
-                            .clip(CircleShape)
-                            .background(DarkSlate)
-                            .border(2.dp, PitchGreen, CircleShape),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = club.name.take(2).uppercase(),
-                            fontWeight = FontWeight.Black,
-                            fontSize = 18.sp,
-                            color = PitchGreen
-                        )
-                    }
+                    ClubCrestIcon(
+                        clubId = club.id,
+                        clubName = club.name,
+                        size = 56.dp
+                    )
 
                     Spacer(modifier = Modifier.width(16.dp))
 

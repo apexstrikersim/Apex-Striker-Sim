@@ -1,5 +1,7 @@
 package com.example.ui.tabs
 
+import com.example.ui.components.ClubCrestIcon
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -437,20 +439,11 @@ fun FixtureDetailDialog(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         modifier = Modifier.weight(1f)
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .size(36.dp)
-                                .clip(CircleShape)
-                                .background(SportsCardBg),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = homeClub?.name?.take(2)?.uppercase() ?: "FC",
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = if (fixture.homeClubId == player.currentClubId) PitchGreen else TextSecondary
-                            )
-                        }
+                        ClubCrestIcon(
+                            clubId = fixture.homeClubId,
+                            clubName = homeClub?.name ?: "Home",
+                            size = 36.dp
+                        )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
                             text = homeClub?.name ?: "Home",
@@ -504,20 +497,11 @@ fun FixtureDetailDialog(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         modifier = Modifier.weight(1f)
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .size(36.dp)
-                                .clip(CircleShape)
-                                .background(SportsCardBg),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = awayClub?.name?.take(2)?.uppercase() ?: "FC",
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = if (fixture.awayClubId == player.currentClubId) PitchGreen else TextSecondary
-                            )
-                        }
+                        ClubCrestIcon(
+                            clubId = fixture.awayClubId,
+                            clubName = awayClub?.name ?: "Away",
+                            size = 36.dp
+                        )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
                             text = awayClub?.name ?: "Away",
@@ -767,20 +751,11 @@ fun MatchFixtureBox(fixture: FixtureEntity, player: PlayerEntity, clubsMap: Map<
 
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         // Initials badge
-                        Box(
-                            modifier = Modifier
-                                .size(24.dp)
-                                .clip(CircleShape)
-                                .background(DarkSlate),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = oppClub?.name?.take(2)?.uppercase() ?: "FC",
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = PitchGreen
-                            )
-                        }
+                        ClubCrestIcon(
+                            clubId = oppClub?.id ?: 0,
+                            clubName = oppClub?.name ?: "Opponent FC",
+                            size = 24.dp
+                        )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
                             text = oppClub?.name ?: "Opponent FC",

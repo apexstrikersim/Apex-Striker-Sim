@@ -44,6 +44,7 @@ class CareerRepository(private val context: Context, val slotId: Int = 1) {
     }
 
     suspend fun getPlayerSync(): PlayerEntity? = dao.getPlayerSync()
+    suspend fun getGameStateSync(): GameStateEntity? = dao.getGameStateSync()
 
     suspend fun clearAllData() {
         db.withTransaction {
@@ -882,11 +883,11 @@ class CareerRepository(private val context: Context, val slotId: Int = 1) {
                 } else {
                     checkAndAwardYouthTrophy(player, gameState)
                     resetYouthLeagueForNewSeason()
+                    player.age += 1
                     val endReport = handleEndOfSeason(player, gameState)
                     gameState.narrativeLog = capNarrativeLog(endReport + "\n\n" + gameState.narrativeLog)
                     gameState.currentSeason += 1
                     gameState.currentMonthIndex = 0
-                    player.age += 1
                     player.streetFootballGamesThisSeason = 0
 
                     if (player.age >= 19 && player.careerPhase != PHASE_SENIOR) {
@@ -946,11 +947,11 @@ class CareerRepository(private val context: Context, val slotId: Int = 1) {
                 } else {
                     checkAndAwardYouthTrophy(player, gameState)
                     resetYouthLeagueForNewSeason()
+                    player.age += 1
                     val endReport = handleEndOfSeason(player, gameState)
                     gameState.narrativeLog = capNarrativeLog(endReport + "\n\n" + gameState.narrativeLog)
                     gameState.currentSeason += 1
                     gameState.currentMonthIndex = 0
-                    player.age += 1
 
                     if (player.age >= 19 && player.careerPhase != PHASE_SENIOR) {
                         gameState.youthCareerEnded = true
@@ -1322,6 +1323,7 @@ class CareerRepository(private val context: Context, val slotId: Int = 1) {
                     // Month is May (9), advance season
                     checkAndAwardYouthTrophy(player, gameState)
                     resetYouthLeagueForNewSeason()
+                    player.age += 1
                     val endReport = handleEndOfSeason(player, gameState)
                     gameState.narrativeLog = capNarrativeLog(endReport + "\n\n" + gameState.narrativeLog)
                     gameState.currentSeason += 1
@@ -1890,9 +1892,6 @@ class CareerRepository(private val context: Context, val slotId: Int = 1) {
 
         // Apply Seasonal Stat Growth or Decline
         applySeasonStatGrowthAndDecline(player, myClub)
-
-        // Increment age
-        player.age += 1
 
         // Contract Evaluation
         evaluateContractEndSeason(player, myClub, seasonLogs, gameState.currentSeason)
@@ -2930,9 +2929,10 @@ private suspend fun adjustClubsReputations(standings: List<StandingEntity>, club
         while (currentSeason == startSeason && safetyCounter < 40) {
             safetyCounter++
             val player = dao.getPlayerSync() ?: break
-            if (player.isRetired || (player.age >= 41 && !player.isGodMode)) break
+            val gs0 = dao.getGameStateSync() ?: break
+            if (player.isRetired || (player.age >= 41 && !player.isGodMode) || gs0.youthCareerEnded) break
 
-            var gs = dao.getGameStateSync() ?: break
+            var gs = gs0
             var resolveAttempts = 0
             while (gs.activeChoicePrompt != null && resolveAttempts < 5) {
                 resolveChoice(1)
@@ -2957,6 +2957,7 @@ private suspend fun adjustClubsReputations(standings: List<StandingEntity>, club
             yield()
 
             val updatedGs = dao.getGameStateSync() ?: break
+            if (updatedGs.youthCareerEnded) break
             currentSeason = updatedGs.currentSeason
         }
     }
@@ -2967,12 +2968,14 @@ private suspend fun adjustClubsReputations(standings: List<StandingEntity>, club
         val count = seasonsToSimulate.coerceIn(1, maxAllowed)
         for (i in 0 until count) {
             val player = dao.getPlayerSync() ?: break
-            if (player.isRetired || (player.age >= 41 && !player.isGodMode)) break
+            val gs = dao.getGameStateSync()
+            if (player.isRetired || (player.age >= 41 && !player.isGodMode) || gs?.youthCareerEnded == true) break
 
             devSimulateFullSeason()
 
             val updatedPlayer = dao.getPlayerSync() ?: break
-            if (updatedPlayer.isRetired || (updatedPlayer.age >= 41 && !updatedPlayer.isGodMode)) break
+            val updatedGs = dao.getGameStateSync()
+            if (updatedPlayer.isRetired || (updatedPlayer.age >= 41 && !updatedPlayer.isGodMode) || updatedGs?.youthCareerEnded == true) break
         }
     }
 

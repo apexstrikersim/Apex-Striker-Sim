@@ -1,5 +1,7 @@
 package com.example.ui.screens
 
+import com.example.ui.components.ClubCrestIcon
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
@@ -90,21 +92,11 @@ fun GameplayScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         // Crest initials
-                        Box(
-                            modifier = Modifier
-                                .size(40.dp)
-                                .clip(CircleShape)
-                                .background(DarkSlate)
-                                .border(1.dp, PitchGreen, CircleShape),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = myClub?.name?.take(2)?.uppercase() ?: "FC",
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 14.sp,
-                                color = PitchGreen
-                            )
-                        }
+                        ClubCrestIcon(
+                            clubId = myClub?.id ?: 0,
+                            clubName = myClub?.name ?: "FC",
+                            size = 40.dp
+                        )
 
                         Spacer(modifier = Modifier.width(12.dp))
 

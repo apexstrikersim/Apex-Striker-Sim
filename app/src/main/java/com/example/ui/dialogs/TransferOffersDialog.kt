@@ -1,5 +1,7 @@
 package com.example.ui.dialogs
 
+import com.example.ui.components.ClubCrestIcon
+
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -139,34 +141,8 @@ fun TransferOffersDialog(viewModel: CareerViewModel) {
 }
 
 @Composable
-fun ClubCrestBadge(clubName: String, size: Dp = 46.dp, modifier: Modifier = Modifier) {
-    val initials = remember(clubName) {
-        clubName.split(" ")
-            .take(2)
-            .map { it.firstOrNull() ?: "" }
-            .joinToString("")
-            .uppercase()
-    }
-    Box(
-        modifier = modifier
-            .size(size)
-            .clip(CircleShape)
-            .background(
-                Brush.verticalGradient(
-                    listOf(Color(0xFF2A2E3D), Color(0xFF1A1D2E))
-                )
-            )
-            .border(1.5.dp, Color(0xFFB8985A), CircleShape),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(
-            text = initials,
-            fontSize = (size.value * 0.38f).sp,
-            fontWeight = FontWeight.Black,
-            color = Color(0xFFB8985A),
-            letterSpacing = 1.sp
-        )
-    }
+fun ClubCrestBadge(clubId: Int, clubName: String, size: Dp = 46.dp, modifier: Modifier = Modifier) {
+    ClubCrestIcon(clubId = clubId, clubName = clubName, size = size, modifier = modifier)
 }
 
 @Composable
@@ -219,7 +195,7 @@ fun ContractSigningDialog(
                         }
                     }
 
-                    ClubCrestBadge(clubName = offer.clubName, size = 46.dp)
+                    ClubCrestBadge(clubId = offer.clubId, clubName = offer.clubName, size = 46.dp)
 
                     Spacer(Modifier.height(6.dp))
                     Text("OFFICIAL CONTRACT", fontFamily = DisplayFontFamily, fontWeight = FontWeight.Black, fontSize = 22.sp, color = inkColor)

@@ -1,5 +1,7 @@
 package com.example.ui.tabs
 
+import com.example.ui.components.ClubCrestIcon
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -235,6 +237,12 @@ fun LeagueTab(viewModel: CareerViewModel, player: PlayerEntity) {
                             }
                         }
 
+                        ClubCrestIcon(
+                            clubId = standing.clubId,
+                            clubName = club?.name ?: "Unknown FC",
+                            size = 20.dp
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
                         Text(
                             text = club?.name ?: "Unknown FC",
                             modifier = Modifier.weight(1f),
@@ -389,20 +397,11 @@ fun LeagueTab(viewModel: CareerViewModel, player: PlayerEntity) {
                                     horizontalArrangement = Arrangement.SpaceBetween
                                 ) {
                                     Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Box(
-                                            modifier = Modifier
-                                                .size(28.dp)
-                                                .clip(CircleShape)
-                                                .background(DarkSlate),
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            Text(
-                                                text = homeClub?.name?.take(2)?.uppercase() ?: "FC",
-                                                fontSize = 11.sp,
-                                                fontWeight = FontWeight.Bold,
-                                                color = if (isMyClub) PitchGreen else TextSecondary
-                                            )
-                                        }
+                                        ClubCrestIcon(
+                                            clubId = homeClub?.id ?: 0,
+                                            clubName = homeClub?.name ?: "FC",
+                                            size = 28.dp
+                                        )
                                         Spacer(modifier = Modifier.width(10.dp))
                                         Text(
                                             text = (homeClub?.name ?: "Unknown") + (if (isMyClub) " (YOU)" else ""),

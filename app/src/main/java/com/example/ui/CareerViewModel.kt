@@ -609,6 +609,16 @@ class CareerViewModel(application: Application) : AndroidViewModel(application) 
             if (player != null && gameState != null) {
                 if (player.careerPhase == com.example.data.PHASE_STREET || player.careerPhase == com.example.data.PHASE_YOUTH) {
                     repository.advanceMonth()
+
+                    val updatedPlayer = repository.getPlayerSync()
+                    val updatedGameState = repository.getGameStateSync()
+
+                    if (updatedPlayer?.isRetired == true) {
+                        _activeScreen.value = Screen.RETIRED_SUMMARY
+                    } else if (updatedGameState?.youthCareerEnded == true) {
+                        _activeScreen.value = Screen.YOUTH_CAREER_ENDED
+                    }
+
                     _isAdvancing.value = false
                     return@launch
                 }
@@ -630,6 +640,15 @@ class CareerViewModel(application: Application) : AndroidViewModel(application) 
                 // All player matches for this month have been simulated!
                 // Run other teams' matches, progression, and monthly choice events
                 repository.simulateRemainingMonth()
+
+                val updatedPlayer = repository.getPlayerSync()
+                val updatedGameState = repository.getGameStateSync()
+
+                if (updatedPlayer?.isRetired == true) {
+                    _activeScreen.value = Screen.RETIRED_SUMMARY
+                } else if (updatedGameState?.youthCareerEnded == true) {
+                    _activeScreen.value = Screen.YOUTH_CAREER_ENDED
+                }
             }
             _isAdvancing.value = false
         }
@@ -864,6 +883,15 @@ class CareerViewModel(application: Application) : AndroidViewModel(application) 
             _isSimulatingSeason.value = true
             try {
                 repository.devSimulateSeasons(count)
+
+                val updatedPlayer = repository.getPlayerSync()
+                val updatedGameState = repository.getGameStateSync()
+
+                if (updatedPlayer?.isRetired == true) {
+                    _activeScreen.value = Screen.RETIRED_SUMMARY
+                } else if (updatedGameState?.youthCareerEnded == true) {
+                    _activeScreen.value = Screen.YOUTH_CAREER_ENDED
+                }
             } finally {
                 _isAdvancing.value = false
                 _isSimulatingSeason.value = false
