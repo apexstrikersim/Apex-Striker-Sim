@@ -209,7 +209,7 @@ fun PreMatchScreen(
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceEvenly,
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.Top
                 ) {
                     // Home
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -239,7 +239,8 @@ fun PreMatchScreen(
                         text = "VS",
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Black,
-                        color = TextSecondary
+                        color = TextSecondary,
+                        modifier = Modifier.padding(top = 22.dp)
                     )
 
                     // Away
@@ -255,6 +256,13 @@ fun PreMatchScreen(
                             fontSize = 14.sp,
                             fontWeight = FontWeight.Bold,
                             color = TextPrimary,
+                            textAlign = TextAlign.Center
+                        )
+                        Text(
+                            text = "YOUR TEAM",
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.Transparent,
                             textAlign = TextAlign.Center
                         )
                     }
