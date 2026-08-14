@@ -1,6 +1,7 @@
 package com.example.ui
 
 import com.example.ui.components.ClubCrestIcon
+import com.example.ui.components.getClubColors
 
 import androidx.compose.animation.*
 import androidx.compose.foundation.BorderStroke
@@ -27,6 +28,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.testTag
@@ -51,7 +53,25 @@ enum class MatchPhase {
 }
 
 enum class MomentType {
-    KEEPER_1V1, THROUGH_BALL, PENALTY, LATE_DEFENSIVE
+    KEEPER_1V1, THROUGH_BALL, PENALTY, LATE_DEFENSIVE,
+
+    // OFFENSIVE SCENARIOS (can score)
+    CROSS_FROM_WING,
+    COUNTER_ATTACK,
+    FREE_KICK_OPPORTUNITY,
+    ONE_ON_ONE_BREAKS,
+    REBOUND_OPPORTUNITY,
+    CORNER_KICK,
+    BUILDUP_PLAY,
+    DETAILED_CROSS,
+    FINAL_MINUTE_PRESSURE,
+    DEFENSIVE_PRESSURE,
+
+    // DEFENSIVE SCENARIOS (cannot directly score)
+    DEFENSIVE_TRANSITION,
+    PRESSING_TRIGGER,
+    SET_PIECE_DEFENSE,
+    GOAL_KICK_PRESSURE
 }
 
 data class BackgroundGoal(
@@ -454,6 +474,138 @@ fun PreMatchScreen(
     }
 }
 
+private fun selectMomentType(
+    min: Int,
+    isLateAndWinning: Boolean,
+    penaltiesGenerated: Int,
+    oppReputation: String
+): MomentType {
+    if (isLateAndWinning && Random.nextFloat() < 0.60f) {
+        return MomentType.LATE_DEFENSIVE
+    }
+
+    val (offWeight, defWeight, origWeight) = when (oppReputation) {
+        "ELITE", "BIG" -> Triple(0.20f, 0.35f, 0.45f)
+        "SMALL", "MID" -> Triple(0.40f, 0.10f, 0.50f)
+        else -> Triple(0.30f, 0.20f, 0.50f)
+    }
+
+    val roll = Random.nextFloat()
+    return when {
+        roll < offWeight -> {
+            listOf(
+                MomentType.CROSS_FROM_WING,
+                MomentType.COUNTER_ATTACK,
+                MomentType.FREE_KICK_OPPORTUNITY,
+                MomentType.ONE_ON_ONE_BREAKS,
+                MomentType.REBOUND_OPPORTUNITY,
+                MomentType.CORNER_KICK,
+                MomentType.BUILDUP_PLAY,
+                MomentType.DETAILED_CROSS,
+                MomentType.FINAL_MINUTE_PRESSURE,
+                MomentType.DEFENSIVE_PRESSURE
+            ).random()
+        }
+        roll < offWeight + defWeight -> {
+            listOf(
+                MomentType.DEFENSIVE_TRANSITION,
+                MomentType.PRESSING_TRIGGER,
+                MomentType.SET_PIECE_DEFENSE,
+                MomentType.GOAL_KICK_PRESSURE
+            ).random()
+        }
+        else -> {
+            if (penaltiesGenerated >= 2) {
+                if (Random.nextFloat() < 0.50f) MomentType.KEEPER_1V1 else MomentType.THROUGH_BALL
+            } else {
+                val origRoll = Random.nextFloat()
+                when {
+                    origRoll < 0.40f -> MomentType.KEEPER_1V1
+                    origRoll < 0.90f -> MomentType.THROUGH_BALL
+                    else -> MomentType.PENALTY
+                }
+            }
+        }
+    }
+}
+
+private fun getMomentDetails(type: MomentType): Pair<String, List<String>> {
+    return when (type) {
+        MomentType.KEEPER_1V1 -> Pair(
+            "You break free from the defensive line! It's just you and the goalkeeper approaching at high speed.",
+            listOf("Chip the keeper", "Shoot low far post", "Round the keeper", "Square to teammate")
+        )
+        MomentType.THROUGH_BALL -> Pair(
+            "A teammate whips a beautiful through-ball into the penalty box. A defender is pressing closely behind you.",
+            listOf("First-time shot", "Take a touch and shoot", "Shield and lay off")
+        )
+        MomentType.PENALTY -> Pair(
+            "PENALTY KICK! You step up to take the penalty under high pressure from the hostile crowd.",
+            listOf("Top Left Corner", "Top Right Corner", "Bottom Left Corner", "Bottom Right Corner")
+        )
+        MomentType.LATE_DEFENSIVE -> Pair(
+            "The opponents are launching a desperate late offensive. You need to drop back and help lock down the victory.",
+            listOf("Track your marker", "Push forward for the counter")
+        )
+        MomentType.CROSS_FROM_WING -> Pair(
+            "⚡ WING CROSS! A dangerous ball whips in from the byline. The box is crowded — can you get a clean connection?",
+            listOf("Dive header", "Stretch to meet it", "Let it bounce", "Cut back for a better chance")
+        )
+        MomentType.COUNTER_ATTACK -> Pair(
+            "⚡ COUNTER ATTACK! Your team wins the ball in the opponent's half. Numbers are ahead — what's your move?",
+            listOf("Run in behind", "Take a quick shot", "Square it early", "Hold up play")
+        )
+        MomentType.FREE_KICK_OPPORTUNITY -> Pair(
+            "⚡ FREE KICK! You win a dangerous set piece opportunity 25 yards from goal. The wall is set...",
+            listOf("Curl it over the wall", "Drive it low", "Lay it short", "Go for the knuckleball")
+        )
+        MomentType.ONE_ON_ONE_BREAKS -> Pair(
+            "⚡ ONE-ON-ONE! You're through on goal but a defender is recovering. Pick your finish carefully.",
+            listOf("Go alone and shoot", "Square to overlapping fullback", "Cut inside onto stronger foot", "Wait for support to arrive")
+        )
+        MomentType.REBOUND_OPPORTUNITY -> Pair(
+            "⚡ REBOUND! The keeper parries the shot but the ball falls loose. First to react gets the chance.",
+            listOf("Pounce on the rebound", "Pass to the edge of the box", "Shoot first-time", "Wait for it to drop")
+        )
+        MomentType.CORNER_KICK -> Pair(
+            "⚡ CORNER KICK! A dangerous delivery is coming in. Where will you attack the ball?",
+            listOf("Attack the near post", "Make a late run to the far post", "Stay back as an outlet", "Go for a crowd-induced scramble")
+        )
+        MomentType.BUILDUP_PLAY -> Pair(
+            "⚡ BUILDUP PLAY! Your team works the ball patiently against a deep block. What's the best way to stretch them?",
+            listOf("Make a diagonal run", "Drop into the pocket", "Switch play to the weak side", "Call for a through ball")
+        )
+        MomentType.DETAILED_CROSS -> Pair(
+            "⚡ BOX CHAOS! A whipped ball into a crowded penalty area. Multiple players are jostling for position.",
+            listOf("Power header", "Glancing effort", "Chest down and shoot", "Lay it off to the edge")
+        )
+        MomentType.FINAL_MINUTE_PRESSURE -> Pair(
+            "⚡ FINAL PUSH! Your team is pouring forward late looking for a winner. Make it count.",
+            listOf("Make a decoy run", "Go for goal yourself", "Create space for a teammate", "Hold the ball up")
+        )
+        MomentType.DEFENSIVE_PRESSURE -> Pair(
+            "⚡ MIDFIELD PRESSURE! Your team is under intense pressure in midfield. Retain or risk losing it?",
+            listOf("Play a risky forward pass", "Safe square pass", "Take on my marker", "Drop deep to regroup")
+        )
+        MomentType.DEFENSIVE_TRANSITION -> Pair(
+            "⚡ COUNTER-PRESSURE! The opponent wins the ball and is breaking forward. Your defensive positioning is critical here.",
+            listOf("Track back and delay the runner", "Cut off the central passing lane", "Hold position for offside trap", "Sprint to press high up the pitch")
+        )
+        MomentType.PRESSING_TRIGGER -> Pair(
+            "⚡ HIGH PRESS! The opponent has the ball under pressure. As the forward, your positioning determines whether they play out safely or lose possession.",
+            listOf("Jump the pass early", "Let it come and win it clean", "Force them wide", "Press the space they want to receive")
+        )
+        MomentType.SET_PIECE_DEFENSE -> Pair(
+            "⚡ SET-PIECE DANGER! The opponent has a corner kick / free kick into the box. Your marking and aerial ability will be tested.",
+            listOf("Jump to head clear the first ball", "Stick tight on my assigned man", "Track the incoming runner", "Cover near post danger")
+        )
+        MomentType.GOAL_KICK_PRESSURE -> Pair(
+            "⚡ GOAL KICK PRESS! You receive the ball as the first attacker but two defenders are closing you down instantly. One touch or three?",
+            listOf("Hold up and wait for support", "Turn and take on the defender", "Quick layoff to midfield", "Attempt the nutmeg and drive")
+        )
+    }
+}
+
 @Composable
 fun LiveMatchSimulation(
     viewModel: CareerViewModel,
@@ -474,6 +626,9 @@ fun LiveMatchSimulation(
     var playerGoalsScored by remember { mutableStateOf(0) }
     var playerAssistsByMe by remember { mutableStateOf(0) }
     var opportunitiesMissed by remember { mutableStateOf(0) }
+    var defensiveActionsCount by remember { mutableStateOf(0) }
+    var possessionLostCount by remember { mutableStateOf(0) }
+    var matchRatingDelta by remember { mutableStateOf(0.0f) }
     var isMatchCompleted by remember { mutableStateOf(false) }
     
     val playerGoalMinutes = remember { mutableStateListOf<Int>() }
@@ -548,41 +703,14 @@ fun LiveMatchSimulation(
             val minRangeEnd = minRangeStart + interval - 2
             val min = Random.nextInt(minRangeStart, minRangeEnd.coerceAtLeast(minRangeStart + 1)).coerceIn(1, 89)
 
-            // Random Moment Type
+            // Random Moment Type using weighted selection
             val isLateAndWinning = min > 75 && (if (fixture.homeClubId == player.currentClubId) runningHomeScore > runningAwayScore else runningAwayScore > runningHomeScore)
-            val type = if (isLateAndWinning && Random.nextFloat() < 0.6f) {
-                MomentType.LATE_DEFENSIVE
-            } else {
-                if (penaltiesGenerated >= 2) {
-                    val roll = Random.nextFloat()
-                    if (roll < 0.435f) MomentType.KEEPER_1V1 else MomentType.THROUGH_BALL
-                } else {
-                    val roll = Random.nextFloat()
-                    when {
-                        roll < 0.40f -> MomentType.KEEPER_1V1
-                        roll < 0.92f -> MomentType.THROUGH_BALL
-                        else -> {
-                            penaltiesGenerated++
-                            MomentType.PENALTY
-                        }
-                    }
-                }
+            val type = selectMomentType(min, isLateAndWinning, penaltiesGenerated, oppClub.reputation)
+            if (type == MomentType.PENALTY) {
+                penaltiesGenerated++
             }
 
-            val desc = when (type) {
-                MomentType.KEEPER_1V1 -> "You break free from the defensive line! It's just you and the goalkeeper approaching at high speed."
-                MomentType.THROUGH_BALL -> "A teammate whips a beautiful through-ball into the penalty box. A defender is pressing closely behind you."
-                MomentType.PENALTY -> "PENALTY KICK! You step up to take the penalty under high pressure from the hostile crowd."
-                MomentType.LATE_DEFENSIVE -> "The opponents are launching a desperate late offensive. You need to drop back and help lock down the victory."
-            }
-
-            val choices = when (type) {
-                MomentType.KEEPER_1V1 -> listOf("Chip the keeper", "Shoot low far post", "Round the keeper", "Square to teammate")
-                MomentType.THROUGH_BALL -> listOf("First-time shot", "Take a touch and shoot", "Shield and lay off")
-                MomentType.PENALTY -> listOf("Top Left Corner", "Top Right Corner", "Bottom Left Corner", "Bottom Right Corner")
-                MomentType.LATE_DEFENSIVE -> listOf("Track your marker", "Push forward for the counter")
-            }
-
+            val (desc, choices) = getMomentDetails(type)
             moments.add(KeyMoment(min, type, desc, choices))
         }
         moments.sortBy { it.minute }
@@ -715,35 +843,8 @@ fun LiveMatchSimulation(
                             penaltiesPreceding++
                         }
                     }
-                    val type = if (isLateAndWinning && Random.nextFloat() < 0.6f) {
-                        MomentType.LATE_DEFENSIVE
-                    } else {
-                        if (penaltiesPreceding >= 2) {
-                            val roll = Random.nextFloat()
-                            if (roll < 0.435f) MomentType.KEEPER_1V1 else MomentType.THROUGH_BALL
-                        } else {
-                            val roll = Random.nextFloat()
-                            when {
-                                roll < 0.40f -> MomentType.KEEPER_1V1
-                                roll < 0.92f -> MomentType.THROUGH_BALL
-                                else -> MomentType.PENALTY
-                            }
-                        }
-                    }
-
-                    val desc = when (type) {
-                        MomentType.KEEPER_1V1 -> "You break free from the defensive line! It's just you and the goalkeeper approaching at high speed."
-                        MomentType.THROUGH_BALL -> "A teammate whips a beautiful through-ball into the penalty box. A defender is pressing closely behind you."
-                        MomentType.PENALTY -> "PENALTY KICK! You step up to take the penalty under high pressure from the hostile crowd."
-                        MomentType.LATE_DEFENSIVE -> "The opponents are launching a late offensive. You need to drop back and help lock down the victory."
-                    }
-
-                    val choices = when (type) {
-                        MomentType.KEEPER_1V1 -> listOf("Chip the keeper", "Shoot low far post", "Round the keeper", "Square to teammate")
-                        MomentType.THROUGH_BALL -> listOf("First-time shot", "Take a touch and shoot", "Shield and lay off")
-                        MomentType.PENALTY -> listOf("Top Left Corner", "Top Right Corner", "Bottom Left Corner", "Bottom Right Corner")
-                        MomentType.LATE_DEFENSIVE -> listOf("Track your marker", "Push forward for the counter")
-                    }
+                    val type = selectMomentType(min, isLateAndWinning, penaltiesPreceding, oppClub.reputation)
+                    val (desc, choices) = getMomentDetails(type)
 
                     generatedKeyMoments[momentIndex] = KeyMoment(min, type, desc, choices)
 
@@ -796,20 +897,13 @@ fun LiveMatchSimulation(
         val moment = generatedKeyMoments[activeMomentIndex]
         activeChoice = choice ?: "Timer Expired"
 
-        if (activeChoice == "Timer Expired" && moment.type != MomentType.PENALTY) {
-            isChoiceSuccessful = false
-            opportunitiesMissed++
-            choiceResolutionResult = when (moment.type) {
-                MomentType.KEEPER_1V1, MomentType.THROUGH_BALL -> {
-                    "You hesitate a split-second too long and a recovering defender pokes the ball away"
-                }
-                MomentType.LATE_DEFENSIVE -> {
-                    "The cross is overhit and rolls out for a goal kick"
-                }
-                else -> ""
-            }
-            return
-        }
+        val isDefensiveScenario = moment.type in listOf(
+            MomentType.LATE_DEFENSIVE,
+            MomentType.DEFENSIVE_TRANSITION,
+            MomentType.PRESSING_TRIGGER,
+            MomentType.SET_PIECE_DEFENSE,
+            MomentType.GOAL_KICK_PRESSURE
+        )
 
         // Compute success rate based on attributes and variables
         val myTeamRepFactor = when (myClub.reputation) {
@@ -841,157 +935,274 @@ fun LiveMatchSimulation(
                 if (choice == "Track your marker") player.physical
                 else player.pace
             }
+            MomentType.CROSS_FROM_WING -> player.finishing
+            MomentType.COUNTER_ATTACK -> player.pace
+            MomentType.FREE_KICK_OPPORTUNITY -> player.technique
+            MomentType.ONE_ON_ONE_BREAKS -> player.finishing
+            MomentType.REBOUND_OPPORTUNITY -> player.finishing
+            MomentType.CORNER_KICK -> player.physical
+            MomentType.BUILDUP_PLAY -> player.passing
+            MomentType.DETAILED_CROSS -> player.physical
+            MomentType.FINAL_MINUTE_PRESSURE -> player.technique
+            MomentType.DEFENSIVE_PRESSURE -> player.passing
+            MomentType.DEFENSIVE_TRANSITION -> player.physical
+            MomentType.PRESSING_TRIGGER -> player.pace
+            MomentType.SET_PIECE_DEFENSE -> player.physical
+            MomentType.GOAL_KICK_PRESSURE -> player.technique
         }
 
-        // Choice tactical bonus or penalty
         var tacticalSwing = when (moment.type) {
-            MomentType.KEEPER_1V1 -> {
-                when (choice) {
-                    "Chip the keeper" -> 0.15f
-                    "Shoot low far post" -> 0.10f
-                    "Round the keeper" -> 0.05f
-                    "Square to teammate" -> 0.20f // high success, counts as assist
-                    else -> -0.15f
-                }
+            MomentType.KEEPER_1V1 -> when (choice) {
+                "Chip the keeper" -> 0.15f
+                "Shoot low far post" -> 0.10f
+                "Round the keeper" -> 0.05f
+                "Square to teammate" -> 0.20f
+                else -> -0.15f
             }
-            MomentType.THROUGH_BALL -> {
-                when (choice) {
-                    "First-time shot" -> 0.05f
-                    "Take a touch and shoot" -> 0.10f
-                    "Shield and lay off" -> 0.20f // Assist chance
-                    else -> -0.15f
-                }
+            MomentType.THROUGH_BALL -> when (choice) {
+                "First-time shot" -> 0.05f
+                "Take a touch and shoot" -> 0.10f
+                "Shield and lay off" -> 0.20f
+                else -> -0.15f
             }
             MomentType.PENALTY -> {
-                // Moving timing bar calculation
                 val inGreenZone = penaltyIndicatorProgress in 0.40f..0.60f
                 if (inGreenZone) 0.25f else -0.20f
             }
-            MomentType.LATE_DEFENSIVE -> {
-                when (choice) {
-                    "Track your marker" -> 0.20f
-                    "Push forward for the counter" -> -0.10f // risky counter
-                    else -> -0.20f
-                }
+            MomentType.LATE_DEFENSIVE -> when (choice) {
+                "Track your marker" -> 0.20f
+                "Push forward for the counter" -> -0.10f
+                else -> -0.20f
+            }
+            MomentType.CROSS_FROM_WING -> when (choice) {
+                "Dive header" -> 0.10f
+                "Stretch to meet it" -> -0.05f
+                "Let it bounce" -> -0.20f
+                "Cut back for a better chance" -> 0.15f
+                else -> 0.0f
+            }
+            MomentType.COUNTER_ATTACK -> when (choice) {
+                "Run in behind" -> 0.15f
+                "Take a quick shot" -> 0.05f
+                "Square it early" -> 0.20f
+                "Hold up play" -> -0.10f
+                else -> 0.0f
+            }
+            MomentType.FREE_KICK_OPPORTUNITY -> when (choice) {
+                "Curl it over the wall" -> 0.15f
+                "Drive it low" -> 0.10f
+                "Lay it short" -> 0.20f
+                "Go for the knuckleball" -> -0.05f
+                else -> 0.0f
+            }
+            MomentType.ONE_ON_ONE_BREAKS -> when (choice) {
+                "Go alone and shoot" -> 0.05f
+                "Square to overlapping fullback" -> 0.20f
+                "Cut inside onto stronger foot" -> 0.10f
+                "Wait for support to arrive" -> -0.15f
+                else -> 0.0f
+            }
+            MomentType.REBOUND_OPPORTUNITY -> when (choice) {
+                "Pounce on the rebound" -> 0.25f
+                "Pass to the edge of the box" -> 0.15f
+                "Shoot first-time" -> 0.20f
+                "Wait for it to drop" -> -0.20f
+                else -> 0.0f
+            }
+            MomentType.CORNER_KICK -> when (choice) {
+                "Attack the near post" -> 0.10f
+                "Make a late run to the far post" -> 0.20f
+                "Stay back as an outlet" -> 0.15f
+                "Go for a crowd-induced scramble" -> -0.10f
+                else -> 0.0f
+            }
+            MomentType.BUILDUP_PLAY -> when (choice) {
+                "Make a diagonal run" -> 0.10f
+                "Drop into the pocket" -> 0.15f
+                "Switch play to the weak side" -> 0.18f
+                "Call for a through ball" -> 0.05f
+                else -> 0.0f
+            }
+            MomentType.DETAILED_CROSS -> when (choice) {
+                "Power header" -> 0.15f
+                "Glancing effort" -> 0.10f
+                "Chest down and shoot" -> 0.08f
+                "Lay it off to the edge" -> 0.20f
+                else -> 0.0f
+            }
+            MomentType.FINAL_MINUTE_PRESSURE -> when (choice) {
+                "Make a decoy run" -> 0.15f
+                "Go for goal yourself" -> -0.05f
+                "Create space for a teammate" -> 0.20f
+                "Hold the ball up" -> 0.25f
+                else -> 0.0f
+            }
+            MomentType.DEFENSIVE_PRESSURE -> when (choice) {
+                "Play a risky forward pass" -> 0.05f
+                "Safe square pass" -> 0.20f
+                "Take on my marker" -> -0.10f
+                "Drop deep to regroup" -> 0.15f
+                else -> 0.0f
+            }
+            MomentType.DEFENSIVE_TRANSITION -> when (choice) {
+                "Track back and delay the runner" -> 0.25f
+                "Cut off the central passing lane" -> 0.15f
+                "Hold position for offside trap" -> -0.10f
+                "Sprint to press high up the pitch" -> -0.20f
+                else -> 0.0f
+            }
+            MomentType.PRESSING_TRIGGER -> when (choice) {
+                "Jump the pass early" -> -0.10f
+                "Let it come and win it clean" -> 0.25f
+                "Force them wide" -> 0.15f
+                "Press the space they want to receive" -> -0.15f
+                else -> 0.0f
+            }
+            MomentType.SET_PIECE_DEFENSE -> when (choice) {
+                "Jump to head clear the first ball" -> 0.30f
+                "Stick tight on my assigned man" -> 0.20f
+                "Track the incoming runner" -> 0.10f
+                "Cover near post danger" -> 0.15f
+                else -> 0.0f
+            }
+            MomentType.GOAL_KICK_PRESSURE -> when (choice) {
+                "Hold up and wait for support" -> 0.30f
+                "Turn and take on the defender" -> -0.05f
+                "Quick layoff to midfield" -> 0.25f
+                "Attempt the nutmeg and drive" -> -0.20f
+                else -> 0.0f
             }
         }
 
         if (choice == "Timer Expired") {
-            tacticalSwing = -0.40f // massive penalty
+            tacticalSwing = -0.40f
         }
 
         val moraleFactor = (player.morale - 50) / 50.0f * 0.08f
         val fanBoost = if (player.fanReputation >= 70 && isPlayerHome) 0.05f else 0.0f
 
-        var successChance = (relevantStat / 100.0f) * myTeamRepFactor * oppRepFactor * formFactor * fatigueFactor + moraleFactor + fanBoost + tacticalSwing
+        val isStrongerOpponent = when (oppClub.reputation) {
+            "ELITE" -> myClub.reputation != "ELITE"
+            "BIG" -> myClub.reputation in listOf("MID", "SMALL")
+            "MID" -> myClub.reputation == "SMALL"
+            else -> false
+        }
+        val oppPenalty = if (isStrongerOpponent) 0.12f else 0.0f
+
+        var successChance = (relevantStat / 100.0f) * myTeamRepFactor * oppRepFactor * formFactor * fatigueFactor + moraleFactor + fanBoost + tacticalSwing - oppPenalty
         successChance = successChance.coerceIn(0.05f, 0.95f)
+
+        if (choice == "Timer Expired") {
+            isChoiceSuccessful = false
+            if (isDefensiveScenario) {
+                matchRatingDelta -= 0.6f
+                if (isPlayerHome) runningAwayScore++ else runningHomeScore++
+                choiceResolutionResult = "TIMEOUT! You failed to react in time. The opponent exploited your indecision and scored!"
+            } else {
+                opportunitiesMissed++
+                possessionLostCount++
+                matchRatingDelta -= 0.4f
+                choiceResolutionResult = "TIMEOUT! You hesitated too long and lost the opportunity."
+            }
+            commentaryLogs.add(
+                LiveCommentary(moment.minute, choiceResolutionResult ?: "", isGoal = isDefensiveScenario, isImportant = true)
+            )
+            return
+        }
 
         val success = Random.nextFloat() < successChance
         isChoiceSuccessful = success
+        var isGoalOutcome = false
 
-        // Outcome mapping
-        if (success) {
-            when (moment.type) {
-                MomentType.KEEPER_1V1 -> {
-                    if (choice == "Square to teammate") {
-                        playerAssistsByMe++
-                        playerAssistMinutes.add(currentMinute)
-                        if (fixture.homeClubId == player.currentClubId) runningHomeScore++ else runningAwayScore++
-                        choiceResolutionResult = "Beautiful team play! You squared the ball across the face of the goal, and your strike partner tapped it in! ASSIST UNLOCKED."
-                    } else {
-                        playerGoalsScored++
-                        playerGoalMinutes.add(currentMinute)
-                        if (fixture.homeClubId == player.currentClubId) runningHomeScore++ else runningAwayScore++
-                        choiceResolutionResult = when (choice) {
-                            "Chip the keeper" -> "GOAL! You delicately chip the ball over the rushing goalkeeper! Pure audacity and finesse!"
-                            "Shoot low far post" -> "GOAL! You clinically side-foot the ball past the keeper into the bottom far corner. Picture perfect!"
-                            "Round the keeper" -> "GOAL! You round the goalkeeper with a swift body feint and roll the ball into the empty net!"
-                            else -> "GOAL! A magnificent finish past the keeper into the back of the net!"
-                        }
-                    }
+        if (isDefensiveScenario) {
+            if (success) {
+                defensiveActionsCount++
+                matchRatingDelta += 0.2f
+                choiceResolutionResult = when (moment.type) {
+                    MomentType.LATE_DEFENSIVE -> "Defensive masterclass! You tracked your marker, intercepted the cross, and cleared the danger."
+                    MomentType.DEFENSIVE_TRANSITION -> "SUPERB TRACKING! You delayed the counter-attack, forcing the opponent back into their own half."
+                    MomentType.PRESSING_TRIGGER -> "BALL WON! Excellent anticipation — you won the ball cleanly and set up a new attack!"
+                    MomentType.SET_PIECE_DEFENSE -> "CLEARANCE! You rose highest and headed the set piece forcefully out of the box."
+                    MomentType.GOAL_KICK_PRESSURE -> "GREAT SHIELDING! You held up the ball smartly under pressure and layed it off safely."
+                    else -> "Solid defending! You stopped the danger."
                 }
-                MomentType.THROUGH_BALL -> {
-                    if (choice == "Shield and lay off") {
-                        playerAssistsByMe++
-                        playerAssistMinutes.add(currentMinute)
-                        if (fixture.homeClubId == player.currentClubId) runningHomeScore++ else runningAwayScore++
-                        choiceResolutionResult = "Masterful hold-up play! You shield off the pressing defender and lay a soft touch to your midfielder, who smashes it in! ASSIST."
-                    } else {
-                        playerGoalsScored++
-                        playerGoalMinutes.add(currentMinute)
-                        if (fixture.homeClubId == player.currentClubId) runningHomeScore++ else runningAwayScore++
-                        choiceResolutionResult = when (choice) {
-                            "First-time shot" -> "GOAL! You hit it first-time on the volley! It rockets into the top corner, leaving the keeper helpless!"
-                            "Take a touch and shoot" -> "GOAL! You compose yourself with a crisp first touch and drill a low drive past the diving keeper!"
-                            else -> "GOAL! You latch onto the through ball and finish with authority!"
-                        }
-                    }
+            } else {
+                val concedeChance = when (oppClub.reputation) {
+                    "ELITE" -> 0.25f
+                    "BIG" -> 0.15f
+                    "MID" -> 0.10f
+                    "SMALL" -> 0.05f
+                    else -> 0.10f
                 }
-                MomentType.PENALTY -> {
-                    playerGoalsScored++
-                    playerGoalMinutes.add(currentMinute)
-                    if (fixture.homeClubId == player.currentClubId) runningHomeScore++ else runningAwayScore++
-                    choiceResolutionResult = when (choice) {
-                        "Top Left Corner" -> "GOAL! You drive the penalty straight into the top left stanchion! Unstoppable precision!"
-                        "Top Right Corner" -> "GOAL! You blast the penalty into the top right corner off the underside of the crossbar!"
-                        "Bottom Left Corner" -> "GOAL! You place it precisely into the bottom left corner, sending the keeper the wrong way!"
-                        "Bottom Right Corner" -> "GOAL! A hard, low strike into the bottom right corner that sneaks past the keeper's fingertips!"
-                        else -> "GOAL! You hit the spot-kick with absolute power and accuracy!"
-                    }
+                val opponentScores = Random.nextFloat() < concedeChance || choice in listOf("Push forward for the counter", "Sprint to press high up the pitch")
+                if (opponentScores) {
+                    if (isPlayerHome) runningAwayScore++ else runningHomeScore++
+                    matchRatingDelta -= 0.8f
+                    isGoalOutcome = true
+                    choiceResolutionResult = "CONCEDED! The opponent punished your defensive choice and scored past the helpless goalkeeper."
+                } else {
+                    possessionLostCount++
+                    matchRatingDelta -= 0.3f
+                    choiceResolutionResult = "POSSESSION LOST! You were caught out of position, but your teammates managed to clear the loose ball."
                 }
-                MomentType.LATE_DEFENSIVE -> {
-                    if (choice == "Track your marker") {
-                        choiceResolutionResult = "Defensive masterclass! You track the opponent's winger, intercept their cross, and clear the danger out of the box."
-                    } else {
-                        // Counters successfully! Adds an extra counter goal
-                        playerGoalsScored++
-                        playerGoalMinutes.add(currentMinute)
-                        if (fixture.homeClubId == player.currentClubId) runningHomeScore++ else runningAwayScore++
-                        choiceResolutionResult = "STUNNING COUNTER-ATTACK! You intercepted a loose clearance, sprinted the length of the pitch, and slotted it home. Game over!"
-                    }
-                }
-            }
-            // If player scored, and rivalRelationship is high, they occasionally assist!
-            val didScore = choice != "Square to teammate" && choice != "Shield and lay off" && moment.type != MomentType.LATE_DEFENSIVE && moment.type != MomentType.PENALTY
-            if (didScore && player.rivalRelationship > 70 && Random.nextFloat() < 0.30f) {
-                choiceResolutionResult += " (A wonderful, selfless assist by your rival striker, ${myClub.rivalStrikerName}!)"
             }
         } else {
-            // Failed
-            opportunitiesMissed++
-            choiceResolutionResult = when (moment.type) {
-                MomentType.KEEPER_1V1 -> when (choice) {
-                    "Chip the keeper" -> "MISSED! You tried to chip the keeper, but they read your intention and plucked the ball out of the air."
-                    "Shoot low far post" -> "MISSED! Your low strike dragged agonizingly wide of the far post."
-                    "Round the keeper" -> "MISSED! The keeper stuck out a hand and smothered the ball right off your boots."
-                    "Square to teammate" -> "INTERCEPTED! The recovering defender read your pass across goal and intercepted it."
-                    else -> "MISSED! The goalkeeper smothered your shot at your feet."
-                }
-                MomentType.THROUGH_BALL -> when (choice) {
-                    "First-time shot" -> "OVER THE BAR! You attempted a first-time volley but leaned back and sent it soaring over the crossbar."
-                    "Take a touch and shoot" -> "BLOCKED! Taking a touch gave the defender time to slide in and block your shot."
-                    "Shield and lay off" -> "DISPOSSESSED! The physical defender muscled you off the ball before you could lay it off."
-                    else -> "OUT OF PLAY! Under heavy pressure, your shot drifted wide."
-                }
-                MomentType.PENALTY -> when (choice) {
-                    "Top Left Corner", "Top Right Corner" -> "OFF THE BAR! You went for the top corner, but the ball rattled off the crossbar!"
-                    "Bottom Left Corner", "Bottom Right Corner" -> "SAVED! The goalkeeper guessed right and made a fingertip save to push it around the post!"
-                    else -> "SAVED! The goalkeeper guesses right and makes a save!"
-                }
-                MomentType.LATE_DEFENSIVE -> {
-                    if (choice == "Track your marker") {
-                        "CONCEDED! You lost your marker for a split second, allowing them to whip in a cross that is headed in by their striker."
-                    } else {
-                        // Counter failed: Opponent scores!
-                        if (fixture.homeClubId == player.currentClubId) runningAwayScore++ else runningHomeScore++
-                        "PUNISHED! You pushed too far forward. The opponent intercepted the pass, exploited the empty space, and scored an equalizer."
+            // Offensive scenario
+            val assistChoices = listOf(
+                "Square to teammate", "Shield and lay off", "Square it early", "Lay it short",
+                "Square to overlapping fullback", "Pass to the edge of the box", "Lay it off to the edge",
+                "Create space for a teammate", "Switch play to the weak side"
+            )
+            val nonGoalSuccessChoices = listOf(
+                "Let it bounce", "Cut back for a better chance", "Hold up play", "Wait for support to arrive",
+                "Stay back as an outlet", "Drop into the pocket", "Make a decoy run", "Hold the ball up",
+                "Safe square pass", "Drop deep to regroup"
+            )
+
+            if (success) {
+                if (choice in assistChoices) {
+                    playerAssistsByMe++
+                    playerAssistMinutes.add(currentMinute)
+                    matchRatingDelta += 1.2f
+                    isGoalOutcome = true
+                    if (isPlayerHome) runningHomeScore++ else runningAwayScore++
+                    choiceResolutionResult = "GREAT VISION! Your brilliant pass picked out a teammate who finished with composure! ASSIST LOGGED."
+                } else if (choice in nonGoalSuccessChoices) {
+                    matchRatingDelta += 0.3f
+                    choiceResolutionResult = "SMART PLAY! You retained possession under pressure and created a promising position."
+                } else {
+                    // Goal scored!
+                    playerGoalsScored++
+                    playerGoalMinutes.add(currentMinute)
+                    matchRatingDelta += 1.8f
+                    isGoalOutcome = true
+                    if (isPlayerHome) runningHomeScore++ else runningAwayScore++
+                    choiceResolutionResult = when (moment.type) {
+                        MomentType.KEEPER_1V1 -> "GOAL! A clinical finish past the rushing goalkeeper!"
+                        MomentType.THROUGH_BALL -> "GOAL! Latched onto the through-ball and struck it clean into the net!"
+                        MomentType.PENALTY -> "GOAL! Slotted the penalty away with absolute composure!"
+                        MomentType.CROSS_FROM_WING -> "GOAL! Connected cleanly with the cross to power it past the keeper!"
+                        MomentType.COUNTER_ATTACK -> "GOAL! Punished the high line on the counter with a ruthless finish!"
+                        MomentType.FREE_KICK_OPPORTUNITY -> "GOAL! Beautiful free kick curling straight into the net!"
+                        MomentType.ONE_ON_ONE_BREAKS -> "GOAL! Coolly beat the defender and slotted it into the bottom corner!"
+                        MomentType.REBOUND_OPPORTUNITY -> "GOAL! Quickest to react to the rebound to smash it home!"
+                        MomentType.CORNER_KICK -> "GOAL! Attacked the corner delivery and turned it past the keeper!"
+                        MomentType.BUILDUP_PLAY -> "GOAL! Magnificent buildup play finished off in style!"
+                        MomentType.DETAILED_CROSS -> "GOAL! Out-jumped the defenders in a crowded box to score!"
+                        MomentType.FINAL_MINUTE_PRESSURE -> "GOAL! Clutch late strike under intense pressure!"
+                        MomentType.DEFENSIVE_PRESSURE -> "GOAL! Escaped the midfield trap and fired home!"
+                        else -> "GOAL! What a magnificent strike!"
                     }
                 }
-            }
 
-            // Apply conceding background goals on late defensive failures
-            if (moment.type == MomentType.LATE_DEFENSIVE && choice == "Track your marker") {
-                if (fixture.homeClubId == player.currentClubId) runningAwayScore++ else runningHomeScore++
+                if (isGoalOutcome && choice !in assistChoices && player.rivalRelationship > 70 && Random.nextFloat() < 0.30f) {
+                    choiceResolutionResult += " (Selfless assist from ${myClub.rivalStrikerName}!)"
+                }
+            } else {
+                opportunitiesMissed++
+                possessionLostCount++
+                matchRatingDelta -= 0.5f
+                choiceResolutionResult = "MISSED! The chance went begging and possession was turned over."
             }
         }
 
@@ -999,7 +1210,7 @@ fun LiveMatchSimulation(
             LiveCommentary(
                 moment.minute,
                 choiceResolutionResult ?: "Possession is lost in an attempt.",
-                isGoal = success && choice != "Square to teammate" && choice != "Shield and lay off" && moment.type != MomentType.LATE_DEFENSIVE,
+                isGoal = isGoalOutcome,
                 isImportant = true
             )
         )
@@ -1267,102 +1478,492 @@ fun LiveMatchSimulation(
                     Spacer(modifier = Modifier.height(12.dp))
 
                     // SCHEMATIC PITCH WHITEBOARD GRAPHIC
+                    val homeCrestColors = remember(fixture.homeClubId) { getClubColors(fixture.homeClubId) }
+                    val awayCrestColors = remember(fixture.awayClubId) { getClubColors(fixture.awayClubId) }
+
+                    val (homePitchColor, awayPitchColor) = remember(homeCrestColors, awayCrestColors) {
+                        val rDiff = kotlin.math.abs(homeCrestColors.first.red - awayCrestColors.first.red)
+                        val gDiff = kotlin.math.abs(homeCrestColors.first.green - awayCrestColors.first.green)
+                        val bDiff = kotlin.math.abs(homeCrestColors.first.blue - awayCrestColors.first.blue)
+                        if ((rDiff + gDiff + bDiff) < 0.35f) {
+                            // Badge primary colors are identical or very close -> use secondary color for away team
+                            val secRDiff = kotlin.math.abs(homeCrestColors.first.red - awayCrestColors.second.red)
+                            val secGDiff = kotlin.math.abs(homeCrestColors.first.green - awayCrestColors.second.green)
+                            val secBDiff = kotlin.math.abs(homeCrestColors.first.blue - awayCrestColors.second.blue)
+                            if ((secRDiff + secGDiff + secBDiff) < 0.35f) {
+                                Pair(homeCrestColors.first, Color(0xFFFACC15))
+                            } else {
+                                Pair(homeCrestColors.first, awayCrestColors.second)
+                            }
+                        } else {
+                            Pair(homeCrestColors.first, awayCrestColors.first)
+                        }
+                    }
+
+                    val userTeamColor = if (isPlayerHome) homePitchColor else awayPitchColor
+                    val oppTeamColor = if (isPlayerHome) awayPitchColor else homePitchColor
+
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(180.dp)
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(Color(0xFF1E3A1E))
-                            .border(1.dp, Color.White.copy(alpha = 0.2f), RoundedCornerShape(8.dp))
+                            .height(210.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(Color(0xFF1B4D2E))
+                            .border(1.5.dp, Color.White.copy(alpha = 0.3f), RoundedCornerShape(10.dp))
                     ) {
                         Canvas(modifier = Modifier.fillMaxSize()) {
                             val w = size.width
                             val h = size.height
 
-                            // Outer border line
+                            // 1. Draw grass background with alternating subtle vertical stripes
+                            val stripeW = w / 8f
+                            for (i in 0..7) {
+                                val sColor = if (i % 2 == 0) Color(0xFF1B4D2E) else Color(0xFF1E5432)
+                                drawRect(
+                                    color = sColor,
+                                    topLeft = Offset(i * stripeW, 0f),
+                                    size = Size(stripeW, h)
+                                )
+                            }
+
+                            // 2. Realistic Football Pitch Markings
+                            val lineCol = Color.White.copy(alpha = 0.45f)
+                            val lineStroke = Stroke(width = 2.2f)
+                            val m = 12f // pitch margin
+
+                            // Boundary touchlines & goal lines
                             drawRect(
-                                color = Color.White.copy(alpha = 0.2f),
-                                topLeft = Offset(10f, 10f),
-                                size = Size(w - 20f, h - 20f),
-                                style = Stroke(width = 2f)
+                                color = lineCol,
+                                topLeft = Offset(m, m),
+                                size = Size(w - 2 * m, h - 2 * m),
+                                style = lineStroke
                             )
 
-                            // Goal Box (Right side Goal box)
-                            drawRect(
-                                color = Color.White.copy(alpha = 0.2f),
-                                topLeft = Offset(w - 60f, h / 2f - 40f),
-                                size = Size(50f, 80f),
-                                style = Stroke(width = 2f)
-                            )
-
-                            // Goal Box (Left side Goal box)
-                            drawRect(
-                                color = Color.White.copy(alpha = 0.2f),
-                                topLeft = Offset(10f, h / 2f - 40f),
-                                size = Size(50f, 80f),
-                                style = Stroke(width = 2f)
-                            )
-
-                            // Center line & circle
+                            // Halfway Line
                             drawLine(
-                                color = Color.White.copy(alpha = 0.2f),
-                                start = Offset(w / 2f, 10f),
-                                end = Offset(w / 2f, h - 10f),
-                                strokeWidth = 2f
-                            )
-                            drawCircle(
-                                color = Color.White.copy(alpha = 0.2f),
-                                center = Offset(w / 2f, h / 2f),
-                                radius = 30f,
-                                style = Stroke(width = 2f)
+                                color = lineCol,
+                                start = Offset(w / 2f, m),
+                                end = Offset(w / 2f, h - m),
+                                strokeWidth = 2.2f
                             )
 
-                            // Draw dots based on key moment type
-                            when (moment.type) {
-                                MomentType.KEEPER_1V1 -> {
-                                    // Player dot (glowing green) running toward right goal
-                                    drawCircle(color = PitchGreen, center = Offset(w * 0.7f, h / 2f), radius = 8f)
-                                    // Ball dot (yellow)
-                                    drawCircle(color = TrophyGold, center = Offset(w * 0.72f, h / 2f), radius = 5f)
-                                    // Goalkeeper (blue)
-                                    drawCircle(color = Color(0xFF3B82F6), center = Offset(w - 30f, h / 2f), radius = 8f)
-                                    // Red Defender trailing from behind
-                                    drawCircle(color = MutedRed, center = Offset(w * 0.55f, h / 2f - 20f), radius = 7f)
-                                    drawCircle(color = MutedRed, center = Offset(w * 0.55f, h / 2f + 20f), radius = 7f)
-                                }
-                                MomentType.THROUGH_BALL -> {
-                                    // Player dot
-                                    drawCircle(color = PitchGreen, center = Offset(w * 0.65f, h * 0.35f), radius = 8f)
-                                    // Ball dot being passed
-                                    drawCircle(color = TrophyGold, center = Offset(w * 0.55f, h * 0.45f), radius = 5f)
-                                    // Midfielder teammate (green outlines)
-                                    drawCircle(color = PitchGreen.copy(alpha = 0.4f), center = Offset(w * 0.4f, h * 0.6f), radius = 7f)
-                                    // Red defender marking closely
-                                    drawCircle(color = MutedRed, center = Offset(w * 0.7f, h * 0.32f), radius = 7f)
-                                }
-                                MomentType.PENALTY -> {
-                                    // Penalty Spot
-                                    drawCircle(color = Color.White.copy(alpha = 0.6f), center = Offset(w - 60f, h / 2f), radius = 3f)
-                                    // Player dot
-                                    drawCircle(color = PitchGreen, center = Offset(w - 80f, h / 2f), radius = 8f)
-                                    // Ball dot
-                                    drawCircle(color = TrophyGold, center = Offset(w - 60f, h / 2f), radius = 5f)
-                                    // Goalkeeper on the line
-                                    drawCircle(color = Color(0xFF3B82F6), center = Offset(w - 15f, h / 2f), radius = 8f)
-                                }
-                                MomentType.LATE_DEFENSIVE -> {
-                                    // Player dot in defense (left half)
-                                    drawCircle(color = PitchGreen, center = Offset(w * 0.25f, h * 0.45f), radius = 8f)
-                                    // Teammate defenders
-                                    drawCircle(color = PitchGreen.copy(alpha = 0.4f), center = Offset(w * 0.15f, h * 0.3f), radius = 7f)
-                                    drawCircle(color = PitchGreen.copy(alpha = 0.4f), center = Offset(w * 0.15f, h * 0.7f), radius = 7f)
-                                    // Ball
-                                    drawCircle(color = TrophyGold, center = Offset(w * 0.32f, h * 0.5f), radius = 5f)
-                                    // Opponent attacker (red) threatening
-                                    drawCircle(color = MutedRed, center = Offset(w * 0.35f, h * 0.55f), radius = 8f)
-                                    drawCircle(color = MutedRed, center = Offset(w * 0.4f, h * 0.3f), radius = 7f)
+                            // Center Circle & Spot
+                            val centerR = (h - 2 * m) * 0.22f
+                            drawCircle(
+                                color = lineCol,
+                                center = Offset(w / 2f, h / 2f),
+                                radius = centerR,
+                                style = lineStroke
+                            )
+                            drawCircle(color = lineCol, center = Offset(w / 2f, h / 2f), radius = 2.5f)
+
+                            // Penalty Boxes (18-yard box)
+                            val boxW = (w - 2 * m) * 0.17f
+                            val boxH = (h - 2 * m) * 0.58f
+                            // Left 18-yard box
+                            drawRect(color = lineCol, topLeft = Offset(m, h / 2f - boxH / 2f), size = Size(boxW, boxH), style = lineStroke)
+                            // Right 18-yard box
+                            drawRect(color = lineCol, topLeft = Offset(w - m - boxW, h / 2f - boxH / 2f), size = Size(boxW, boxH), style = lineStroke)
+
+                            // Goal Boxes (6-yard box)
+                            val gBoxW = boxW * 0.36f
+                            val gBoxH = boxH * 0.44f
+                            // Left 6-yard box
+                            drawRect(color = lineCol, topLeft = Offset(m, h / 2f - gBoxH / 2f), size = Size(gBoxW, gBoxH), style = lineStroke)
+                            // Right 6-yard box
+                            drawRect(color = lineCol, topLeft = Offset(w - m - gBoxW, h / 2f - gBoxH / 2f), size = Size(gBoxW, gBoxH), style = lineStroke)
+
+                            // Penalty Spots & Arcs
+                            val leftPenSpotX = m + boxW * 0.65f
+                            drawCircle(color = lineCol, center = Offset(leftPenSpotX, h / 2f), radius = 2.5f)
+                            drawArc(
+                                color = lineCol,
+                                startAngle = -55f,
+                                sweepAngle = 110f,
+                                useCenter = false,
+                                topLeft = Offset(leftPenSpotX - centerR * 0.7f, h / 2f - centerR * 0.7f),
+                                size = Size(centerR * 1.4f, centerR * 1.4f),
+                                style = lineStroke
+                            )
+
+                            val rightPenSpotX = w - m - boxW * 0.65f
+                            drawCircle(color = lineCol, center = Offset(rightPenSpotX, h / 2f), radius = 2.5f)
+                            drawArc(
+                                color = lineCol,
+                                startAngle = 125f,
+                                sweepAngle = 110f,
+                                useCenter = false,
+                                topLeft = Offset(rightPenSpotX - centerR * 0.7f, h / 2f - centerR * 0.7f),
+                                size = Size(centerR * 1.4f, centerR * 1.4f),
+                                style = lineStroke
+                            )
+
+                            // Corner Arcs
+                            val cornerR = 10f
+                            drawArc(color = lineCol, startAngle = 0f, sweepAngle = 90f, useCenter = false, topLeft = Offset(m - cornerR, m - cornerR), size = Size(cornerR * 2, cornerR * 2), style = lineStroke)
+                            drawArc(color = lineCol, startAngle = 90f, sweepAngle = 90f, useCenter = false, topLeft = Offset(w - m - cornerR, m - cornerR), size = Size(cornerR * 2, cornerR * 2), style = lineStroke)
+                            drawArc(color = lineCol, startAngle = 270f, sweepAngle = 90f, useCenter = false, topLeft = Offset(m - cornerR, h - m - cornerR), size = Size(cornerR * 2, cornerR * 2), style = lineStroke)
+                            drawArc(color = lineCol, startAngle = 180f, sweepAngle = 90f, useCenter = false, topLeft = Offset(w - m - cornerR, h - m - cornerR), size = Size(cornerR * 2, cornerR * 2), style = lineStroke)
+
+                            // Goal posts
+                            val gDepth = 6f
+                            val gHeight = gBoxH * 0.8f
+                            drawRect(color = Color.White.copy(alpha = 0.35f), topLeft = Offset(m - gDepth, h / 2f - gHeight / 2f), size = Size(gDepth, gHeight), style = Stroke(width = 1.5f))
+                            drawRect(color = Color.White.copy(alpha = 0.35f), topLeft = Offset(w - m, h / 2f - gHeight / 2f), size = Size(gDepth, gHeight), style = Stroke(width = 1.5f))
+
+                            // Helper functions for drawing tactical dots
+                            fun drawDot(xFrac: Float, yFrac: Float, color: Color, isUser: Boolean = false, isGk: Boolean = false) {
+                                val px = w * xFrac
+                                val py = h * yFrac
+                                val dotLum = color.red * 0.299f + color.green * 0.587f + color.blue * 0.114f
+                                val outlineColor = if (dotLum < 0.55f) Color.White else Color(0xFF111827)
+
+                                if (isGk) {
+                                    val gkColor = if (dotLum > 0.5f) Color(0xFF1E3A8A) else Color(0xFF10B981)
+                                    val gkLum = gkColor.red * 0.299f + gkColor.green * 0.587f + gkColor.blue * 0.114f
+                                    val gkOutline = if (gkLum < 0.55f) Color.White else Color(0xFF111827)
+                                    drawCircle(color = gkColor, center = Offset(px, py), radius = 7.5f)
+                                    drawCircle(color = gkOutline, center = Offset(px, py), radius = 7.5f, style = Stroke(width = 1.6f))
+                                } else if (isUser) {
+                                    // USER PLAYER: Distinct outer halo ring + bright border + star core
+                                    drawCircle(color = TrophyGold.copy(alpha = 0.45f), center = Offset(px, py), radius = 14f)
+                                    drawCircle(color = TrophyGold, center = Offset(px, py), radius = 11f, style = Stroke(width = 2f))
+                                    drawCircle(color = color, center = Offset(px, py), radius = 8.5f)
+                                    drawCircle(color = outlineColor, center = Offset(px, py), radius = 8.5f, style = Stroke(width = 2f))
+                                    drawCircle(color = Color.White, center = Offset(px, py), radius = 3f)
+                                } else {
+                                    drawCircle(color = color, center = Offset(px, py), radius = 6.5f)
+                                    drawCircle(color = outlineColor, center = Offset(px, py), radius = 6.5f, style = Stroke(width = 1.5f))
                                 }
                             }
+
+                            fun drawBall(xFrac: Float, yFrac: Float) {
+                                val bx = w * xFrac
+                                val by = h * yFrac
+                                drawCircle(color = Color.Black.copy(alpha = 0.5f), center = Offset(bx + 2f, by + 2f), radius = 5f)
+                                drawCircle(color = Color.White, center = Offset(bx, by), radius = 5f)
+                                drawCircle(color = Color.Black, center = Offset(bx, by), radius = 5f, style = Stroke(width = 1.2f))
+                                drawCircle(color = Color(0xFF1E293B), center = Offset(bx, by), radius = 2f)
+                            }
+
+                            fun drawTrajectory(sx: Float, sy: Float, ex: Float, ey: Float) {
+                                drawLine(
+                                    color = Color.White.copy(alpha = 0.6f),
+                                    start = Offset(w * sx, h * sy),
+                                    end = Offset(w * ex, h * ey),
+                                    strokeWidth = 2f,
+                                    pathEffect = PathEffect.dashPathEffect(floatArrayOf(8f, 6f), 0f)
+                                )
+                            }
+
+                            // 3. Render 11 vs 11 Tactical Positions & Ball per Key Moment
+                            when (moment.type) {
+                                MomentType.KEEPER_1V1 -> {
+                                    val userDots = listOf(
+                                        Pair(0.06f, 0.50f), Pair(0.38f, 0.20f), Pair(0.35f, 0.40f), Pair(0.35f, 0.60f), Pair(0.38f, 0.80f),
+                                        Pair(0.50f, 0.35f), Pair(0.50f, 0.65f), Pair(0.58f, 0.50f), Pair(0.68f, 0.22f), Pair(0.72f, 0.50f), Pair(0.68f, 0.78f)
+                                    )
+                                    val oppDots = listOf(
+                                        Pair(0.92f, 0.50f), Pair(0.64f, 0.44f), Pair(0.64f, 0.56f), Pair(0.62f, 0.18f), Pair(0.62f, 0.82f),
+                                        Pair(0.55f, 0.35f), Pair(0.55f, 0.65f), Pair(0.48f, 0.50f), Pair(0.32f, 0.42f), Pair(0.32f, 0.58f), Pair(0.20f, 0.50f)
+                                    )
+                                    userDots.forEachIndexed { i, (x, y) -> drawDot(x, y, userTeamColor, isUser = (i == 9), isGk = (i == 0)) }
+                                    oppDots.forEachIndexed { i, (x, y) -> drawDot(x, y, oppTeamColor, isUser = false, isGk = (i == 0)) }
+                                    drawTrajectory(0.58f, 0.50f, 0.72f, 0.50f)
+                                    drawBall(0.74f, 0.50f)
+                                }
+                                MomentType.THROUGH_BALL -> {
+                                    val userDots = listOf(
+                                        Pair(0.06f, 0.50f), Pair(0.36f, 0.18f), Pair(0.34f, 0.38f), Pair(0.34f, 0.62f), Pair(0.36f, 0.82f),
+                                        Pair(0.48f, 0.35f), Pair(0.48f, 0.65f), Pair(0.58f, 0.50f), Pair(0.70f, 0.20f), Pair(0.76f, 0.38f), Pair(0.70f, 0.80f)
+                                    )
+                                    val oppDots = listOf(
+                                        Pair(0.94f, 0.50f), Pair(0.78f, 0.36f), Pair(0.75f, 0.55f), Pair(0.72f, 0.18f), Pair(0.72f, 0.82f),
+                                        Pair(0.56f, 0.38f), Pair(0.56f, 0.62f), Pair(0.45f, 0.50f), Pair(0.30f, 0.40f), Pair(0.30f, 0.60f), Pair(0.20f, 0.50f)
+                                    )
+                                    userDots.forEachIndexed { i, (x, y) -> drawDot(x, y, userTeamColor, isUser = (i == 9), isGk = (i == 0)) }
+                                    oppDots.forEachIndexed { i, (x, y) -> drawDot(x, y, oppTeamColor, isUser = false, isGk = (i == 0)) }
+                                    drawTrajectory(0.58f, 0.50f, 0.76f, 0.38f)
+                                    drawBall(0.68f, 0.43f)
+                                }
+                                MomentType.PENALTY -> {
+                                    val userDots = listOf(
+                                        Pair(0.06f, 0.50f), Pair(0.80f, 0.50f), Pair(0.70f, 0.28f), Pair(0.71f, 0.38f), Pair(0.72f, 0.48f),
+                                        Pair(0.72f, 0.58f), Pair(0.71f, 0.68f), Pair(0.70f, 0.78f), Pair(0.60f, 0.35f), Pair(0.60f, 0.65f), Pair(0.50f, 0.50f)
+                                    )
+                                    val oppDots = listOf(
+                                        Pair(0.96f, 0.50f), Pair(0.73f, 0.22f), Pair(0.73f, 0.33f), Pair(0.74f, 0.43f), Pair(0.74f, 0.53f),
+                                        Pair(0.73f, 0.63f), Pair(0.73f, 0.73f), Pair(0.62f, 0.30f), Pair(0.62f, 0.70f), Pair(0.52f, 0.45f), Pair(0.52f, 0.55f)
+                                    )
+                                    userDots.forEachIndexed { i, (x, y) -> drawDot(x, y, userTeamColor, isUser = (i == 1), isGk = (i == 0)) }
+                                    oppDots.forEachIndexed { i, (x, y) -> drawDot(x, y, oppTeamColor, isUser = false, isGk = (i == 0)) }
+                                    drawBall(0.86f, 0.50f)
+                                }
+                                MomentType.LATE_DEFENSIVE -> {
+                                    val userDots = listOf(
+                                        Pair(0.06f, 0.50f), Pair(0.20f, 0.22f), Pair(0.18f, 0.38f), Pair(0.18f, 0.62f), Pair(0.20f, 0.78f),
+                                        Pair(0.26f, 0.40f), Pair(0.24f, 0.58f), Pair(0.32f, 0.25f), Pair(0.32f, 0.75f), Pair(0.42f, 0.40f), Pair(0.42f, 0.60f)
+                                    )
+                                    val oppDots = listOf(
+                                        Pair(0.94f, 0.50f), Pair(0.12f, 0.18f), Pair(0.22f, 0.42f), Pair(0.20f, 0.55f), Pair(0.14f, 0.32f),
+                                        Pair(0.30f, 0.30f), Pair(0.30f, 0.50f), Pair(0.30f, 0.70f), Pair(0.45f, 0.25f), Pair(0.42f, 0.48f), Pair(0.45f, 0.85f)
+                                    )
+                                    userDots.forEachIndexed { i, (x, y) -> drawDot(x, y, userTeamColor, isUser = (i == 5), isGk = (i == 0)) }
+                                    oppDots.forEachIndexed { i, (x, y) -> drawDot(x, y, oppTeamColor, isUser = false, isGk = (i == 0)) }
+                                    drawTrajectory(0.12f, 0.18f, 0.22f, 0.42f)
+                                    drawBall(0.12f, 0.18f)
+                                }
+                                MomentType.CROSS_FROM_WING -> {
+                                    val userDots = listOf(
+                                        Pair(0.06f, 0.50f), Pair(0.90f, 0.15f), Pair(0.82f, 0.48f), Pair(0.80f, 0.32f), Pair(0.78f, 0.65f),
+                                        Pair(0.72f, 0.50f), Pair(0.55f, 0.30f), Pair(0.55f, 0.70f), Pair(0.40f, 0.20f), Pair(0.38f, 0.50f), Pair(0.40f, 0.80f)
+                                    )
+                                    val oppDots = listOf(
+                                        Pair(0.95f, 0.50f), Pair(0.84f, 0.42f), Pair(0.84f, 0.55f), Pair(0.86f, 0.28f), Pair(0.82f, 0.70f),
+                                        Pair(0.68f, 0.35f), Pair(0.68f, 0.65f), Pair(0.60f, 0.50f), Pair(0.45f, 0.40f), Pair(0.45f, 0.60f), Pair(0.35f, 0.50f)
+                                    )
+                                    userDots.forEachIndexed { i, (x, y) -> drawDot(x, y, userTeamColor, isUser = (i == 2), isGk = (i == 0)) }
+                                    oppDots.forEachIndexed { i, (x, y) -> drawDot(x, y, oppTeamColor, isUser = false, isGk = (i == 0)) }
+                                    drawTrajectory(0.90f, 0.15f, 0.82f, 0.48f)
+                                    drawBall(0.85f, 0.30f)
+                                }
+                                MomentType.COUNTER_ATTACK -> {
+                                    val userDots = listOf(
+                                        Pair(0.06f, 0.50f), Pair(0.28f, 0.20f), Pair(0.25f, 0.40f), Pair(0.25f, 0.60f), Pair(0.28f, 0.80f),
+                                        Pair(0.38f, 0.35f), Pair(0.38f, 0.65f), Pair(0.56f, 0.48f), Pair(0.68f, 0.22f), Pair(0.68f, 0.78f), Pair(0.64f, 0.50f)
+                                    )
+                                    val oppDots = listOf(
+                                        Pair(0.94f, 0.50f), Pair(0.72f, 0.40f), Pair(0.72f, 0.60f), Pair(0.60f, 0.15f), Pair(0.60f, 0.85f),
+                                        Pair(0.45f, 0.30f), Pair(0.45f, 0.50f), Pair(0.45f, 0.70f), Pair(0.35f, 0.35f), Pair(0.35f, 0.65f), Pair(0.22f, 0.50f)
+                                    )
+                                    userDots.forEachIndexed { i, (x, y) -> drawDot(x, y, userTeamColor, isUser = (i == 7), isGk = (i == 0)) }
+                                    oppDots.forEachIndexed { i, (x, y) -> drawDot(x, y, oppTeamColor, isUser = false, isGk = (i == 0)) }
+                                    drawBall(0.58f, 0.48f)
+                                }
+                                MomentType.FREE_KICK_OPPORTUNITY -> {
+                                    val userDots = listOf(
+                                        Pair(0.06f, 0.50f), Pair(0.68f, 0.50f), Pair(0.80f, 0.25f), Pair(0.82f, 0.35f), Pair(0.83f, 0.50f),
+                                        Pair(0.82f, 0.65f), Pair(0.80f, 0.75f), Pair(0.65f, 0.35f), Pair(0.65f, 0.65f), Pair(0.50f, 0.30f), Pair(0.50f, 0.70f)
+                                    )
+                                    val oppDots = listOf(
+                                        Pair(0.95f, 0.42f), Pair(0.81f, 0.44f), Pair(0.81f, 0.48f), Pair(0.81f, 0.52f), Pair(0.81f, 0.56f),
+                                        Pair(0.85f, 0.28f), Pair(0.86f, 0.38f), Pair(0.86f, 0.62f), Pair(0.85f, 0.72f), Pair(0.72f, 0.20f), Pair(0.72f, 0.80f)
+                                    )
+                                    userDots.forEachIndexed { i, (x, y) -> drawDot(x, y, userTeamColor, isUser = (i == 1), isGk = (i == 0)) }
+                                    oppDots.forEachIndexed { i, (x, y) -> drawDot(x, y, oppTeamColor, isUser = false, isGk = (i == 0)) }
+                                    drawBall(0.70f, 0.50f)
+                                }
+                                MomentType.ONE_ON_ONE_BREAKS -> {
+                                    val userDots = listOf(
+                                        Pair(0.06f, 0.50f), Pair(0.35f, 0.18f), Pair(0.32f, 0.40f), Pair(0.32f, 0.60f), Pair(0.35f, 0.82f),
+                                        Pair(0.48f, 0.35f), Pair(0.48f, 0.65f), Pair(0.58f, 0.50f), Pair(0.74f, 0.35f), Pair(0.82f, 0.18f), Pair(0.68f, 0.60f)
+                                    )
+                                    val oppDots = listOf(
+                                        Pair(0.94f, 0.40f), Pair(0.78f, 0.48f), Pair(0.72f, 0.22f), Pair(0.70f, 0.65f), Pair(0.68f, 0.85f),
+                                        Pair(0.55f, 0.40f), Pair(0.55f, 0.60f), Pair(0.45f, 0.50f), Pair(0.30f, 0.40f), Pair(0.30f, 0.60f), Pair(0.20f, 0.50f)
+                                    )
+                                    userDots.forEachIndexed { i, (x, y) -> drawDot(x, y, userTeamColor, isUser = (i == 8), isGk = (i == 0)) }
+                                    oppDots.forEachIndexed { i, (x, y) -> drawDot(x, y, oppTeamColor, isUser = false, isGk = (i == 0)) }
+                                    drawBall(0.76f, 0.35f)
+                                }
+                                MomentType.REBOUND_OPPORTUNITY -> {
+                                    val userDots = listOf(
+                                        Pair(0.06f, 0.50f), Pair(0.40f, 0.20f), Pair(0.38f, 0.42f), Pair(0.38f, 0.58f), Pair(0.40f, 0.80f),
+                                        Pair(0.55f, 0.35f), Pair(0.55f, 0.65f), Pair(0.68f, 0.50f), Pair(0.81f, 0.52f), Pair(0.80f, 0.30f), Pair(0.80f, 0.70f)
+                                    )
+                                    val oppDots = listOf(
+                                        Pair(0.92f, 0.38f), Pair(0.87f, 0.58f), Pair(0.86f, 0.32f), Pair(0.85f, 0.70f), Pair(0.75f, 0.45f),
+                                        Pair(0.75f, 0.55f), Pair(0.60f, 0.30f), Pair(0.60f, 0.70f), Pair(0.45f, 0.40f), Pair(0.45f, 0.60f), Pair(0.30f, 0.50f)
+                                    )
+                                    userDots.forEachIndexed { i, (x, y) -> drawDot(x, y, userTeamColor, isUser = (i == 8), isGk = (i == 0)) }
+                                    oppDots.forEachIndexed { i, (x, y) -> drawDot(x, y, oppTeamColor, isUser = false, isGk = (i == 0)) }
+                                    drawBall(0.85f, 0.52f)
+                                }
+                                MomentType.CORNER_KICK -> {
+                                    val userDots = listOf(
+                                        Pair(0.06f, 0.50f), Pair(0.97f, 0.05f), Pair(0.82f, 0.48f), Pair(0.84f, 0.35f), Pair(0.85f, 0.58f),
+                                        Pair(0.78f, 0.65f), Pair(0.68f, 0.50f), Pair(0.55f, 0.30f), Pair(0.55f, 0.70f), Pair(0.40f, 0.25f), Pair(0.40f, 0.75f)
+                                    )
+                                    val oppDots = listOf(
+                                        Pair(0.95f, 0.42f), Pair(0.85f, 0.38f), Pair(0.84f, 0.46f), Pair(0.86f, 0.55f), Pair(0.83f, 0.62f),
+                                        Pair(0.78f, 0.42f), Pair(0.70f, 0.50f), Pair(0.60f, 0.30f), Pair(0.60f, 0.70f), Pair(0.48f, 0.40f), Pair(0.48f, 0.60f)
+                                    )
+                                    userDots.forEachIndexed { i, (x, y) -> drawDot(x, y, userTeamColor, isUser = (i == 2), isGk = (i == 0)) }
+                                    oppDots.forEachIndexed { i, (x, y) -> drawDot(x, y, oppTeamColor, isUser = false, isGk = (i == 0)) }
+                                    drawTrajectory(0.97f, 0.05f, 0.82f, 0.48f)
+                                    drawBall(0.88f, 0.30f)
+                                }
+                                MomentType.BUILDUP_PLAY -> {
+                                    val userDots = listOf(
+                                        Pair(0.06f, 0.50f), Pair(0.32f, 0.18f), Pair(0.28f, 0.38f), Pair(0.28f, 0.62f), Pair(0.32f, 0.82f),
+                                        Pair(0.40f, 0.50f), Pair(0.52f, 0.50f), Pair(0.48f, 0.28f), Pair(0.65f, 0.18f), Pair(0.65f, 0.82f), Pair(0.75f, 0.50f)
+                                    )
+                                    val oppDots = listOf(
+                                        Pair(0.94f, 0.50f), Pair(0.78f, 0.20f), Pair(0.76f, 0.40f), Pair(0.76f, 0.60f), Pair(0.78f, 0.80f),
+                                        Pair(0.60f, 0.22f), Pair(0.58f, 0.42f), Pair(0.58f, 0.58f), Pair(0.60f, 0.78f), Pair(0.42f, 0.42f), Pair(0.42f, 0.58f)
+                                    )
+                                    userDots.forEachIndexed { i, (x, y) -> drawDot(x, y, userTeamColor, isUser = (i == 6), isGk = (i == 0)) }
+                                    oppDots.forEachIndexed { i, (x, y) -> drawDot(x, y, oppTeamColor, isUser = false, isGk = (i == 0)) }
+                                    drawTrajectory(0.40f, 0.50f, 0.52f, 0.50f)
+                                    drawBall(0.51f, 0.50f)
+                                }
+                                MomentType.DETAILED_CROSS -> {
+                                    val userDots = listOf(
+                                        Pair(0.06f, 0.50f), Pair(0.83f, 0.48f), Pair(0.85f, 0.38f), Pair(0.82f, 0.60f), Pair(0.72f, 0.20f),
+                                        Pair(0.70f, 0.50f), Pair(0.72f, 0.80f), Pair(0.55f, 0.35f), Pair(0.55f, 0.65f), Pair(0.38f, 0.30f), Pair(0.38f, 0.70f)
+                                    )
+                                    val oppDots = listOf(
+                                        Pair(0.95f, 0.45f), Pair(0.85f, 0.42f), Pair(0.84f, 0.52f), Pair(0.86f, 0.32f), Pair(0.86f, 0.65f),
+                                        Pair(0.78f, 0.48f), Pair(0.65f, 0.30f), Pair(0.65f, 0.70f), Pair(0.50f, 0.40f), Pair(0.50f, 0.60f), Pair(0.35f, 0.50f)
+                                    )
+                                    userDots.forEachIndexed { i, (x, y) -> drawDot(x, y, userTeamColor, isUser = (i == 1), isGk = (i == 0)) }
+                                    oppDots.forEachIndexed { i, (x, y) -> drawDot(x, y, oppTeamColor, isUser = false, isGk = (i == 0)) }
+                                    drawBall(0.83f, 0.42f)
+                                }
+                                MomentType.FINAL_MINUTE_PRESSURE -> {
+                                    val userDots = listOf(
+                                        Pair(0.30f, 0.50f), Pair(0.58f, 0.25f), Pair(0.55f, 0.50f), Pair(0.58f, 0.75f), Pair(0.68f, 0.30f),
+                                        Pair(0.68f, 0.70f), Pair(0.78f, 0.50f), Pair(0.84f, 0.25f), Pair(0.86f, 0.42f), Pair(0.86f, 0.58f), Pair(0.84f, 0.75f)
+                                    )
+                                    val oppDots = listOf(
+                                        Pair(0.95f, 0.50f), Pair(0.88f, 0.20f), Pair(0.88f, 0.32f), Pair(0.89f, 0.42f), Pair(0.89f, 0.58f),
+                                        Pair(0.88f, 0.68f), Pair(0.88f, 0.80f), Pair(0.82f, 0.30f), Pair(0.82f, 0.45f), Pair(0.82f, 0.55f), Pair(0.82f, 0.70f)
+                                    )
+                                    userDots.forEachIndexed { i, (x, y) -> drawDot(x, y, userTeamColor, isUser = (i == 6), isGk = (i == 0)) }
+                                    oppDots.forEachIndexed { i, (x, y) -> drawDot(x, y, oppTeamColor, isUser = false, isGk = (i == 0)) }
+                                    drawBall(0.76f, 0.50f)
+                                }
+                                MomentType.DEFENSIVE_PRESSURE -> {
+                                    val userDots = listOf(
+                                        Pair(0.06f, 0.50f), Pair(0.28f, 0.20f), Pair(0.25f, 0.40f), Pair(0.25f, 0.60f), Pair(0.28f, 0.80f),
+                                        Pair(0.46f, 0.50f), Pair(0.38f, 0.35f), Pair(0.38f, 0.65f), Pair(0.60f, 0.20f), Pair(0.65f, 0.50f), Pair(0.60f, 0.80f)
+                                    )
+                                    val oppDots = listOf(
+                                        Pair(0.94f, 0.50f), Pair(0.42f, 0.40f), Pair(0.52f, 0.52f), Pair(0.44f, 0.62f), Pair(0.65f, 0.25f),
+                                        Pair(0.62f, 0.48f), Pair(0.62f, 0.72f), Pair(0.65f, 0.88f), Pair(0.30f, 0.35f), Pair(0.30f, 0.65f), Pair(0.20f, 0.50f)
+                                    )
+                                    userDots.forEachIndexed { i, (x, y) -> drawDot(x, y, userTeamColor, isUser = (i == 5), isGk = (i == 0)) }
+                                    oppDots.forEachIndexed { i, (x, y) -> drawDot(x, y, oppTeamColor, isUser = false, isGk = (i == 0)) }
+                                    drawBall(0.45f, 0.50f)
+                                }
+                                MomentType.DEFENSIVE_TRANSITION -> {
+                                    val userDots = listOf(
+                                        Pair(0.06f, 0.50f), Pair(0.22f, 0.20f), Pair(0.20f, 0.38f), Pair(0.20f, 0.62f), Pair(0.22f, 0.80f),
+                                        Pair(0.36f, 0.44f), Pair(0.30f, 0.60f), Pair(0.42f, 0.25f), Pair(0.42f, 0.75f), Pair(0.55f, 0.40f), Pair(0.55f, 0.60f)
+                                    )
+                                    val oppDots = listOf(
+                                        Pair(0.94f, 0.50f), Pair(0.42f, 0.50f), Pair(0.48f, 0.22f), Pair(0.48f, 0.78f), Pair(0.32f, 0.35f),
+                                        Pair(0.65f, 0.30f), Pair(0.65f, 0.70f), Pair(0.75f, 0.20f), Pair(0.72f, 0.40f), Pair(0.72f, 0.60f), Pair(0.75f, 0.80f)
+                                    )
+                                    userDots.forEachIndexed { i, (x, y) -> drawDot(x, y, userTeamColor, isUser = (i == 5), isGk = (i == 0)) }
+                                    oppDots.forEachIndexed { i, (x, y) -> drawDot(x, y, oppTeamColor, isUser = false, isGk = (i == 0)) }
+                                    drawTrajectory(0.42f, 0.50f, 0.32f, 0.35f)
+                                    drawBall(0.43f, 0.50f)
+                                }
+                                MomentType.PRESSING_TRIGGER -> {
+                                    val userDots = listOf(
+                                        Pair(0.06f, 0.50f), Pair(0.42f, 0.20f), Pair(0.38f, 0.40f), Pair(0.38f, 0.60f), Pair(0.42f, 0.80f),
+                                        Pair(0.50f, 0.35f), Pair(0.50f, 0.65f), Pair(0.40f, 0.50f), Pair(0.28f, 0.38f), Pair(0.30f, 0.18f), Pair(0.30f, 0.65f)
+                                    )
+                                    val oppDots = listOf(
+                                        Pair(0.08f, 0.50f), Pair(0.20f, 0.35f), Pair(0.18f, 0.18f), Pair(0.18f, 0.62f), Pair(0.18f, 0.82f),
+                                        Pair(0.32f, 0.35f), Pair(0.32f, 0.65f), Pair(0.45f, 0.50f), Pair(0.60f, 0.30f), Pair(0.60f, 0.70f), Pair(0.70f, 0.50f)
+                                    )
+                                    userDots.forEachIndexed { i, (x, y) -> drawDot(x, y, userTeamColor, isUser = (i == 8), isGk = (i == 0)) }
+                                    oppDots.forEachIndexed { i, (x, y) -> drawDot(x, y, oppTeamColor, isUser = false, isGk = (i == 0)) }
+                                    drawTrajectory(0.28f, 0.38f, 0.20f, 0.35f)
+                                    drawBall(0.21f, 0.35f)
+                                }
+                                MomentType.SET_PIECE_DEFENSE -> {
+                                    val userDots = listOf(
+                                        Pair(0.06f, 0.50f), Pair(0.18f, 0.48f), Pair(0.15f, 0.35f), Pair(0.15f, 0.60f), Pair(0.12f, 0.42f),
+                                        Pair(0.12f, 0.55f), Pair(0.24f, 0.30f), Pair(0.24f, 0.70f), Pair(0.32f, 0.50f), Pair(0.48f, 0.35f), Pair(0.48f, 0.65f)
+                                    )
+                                    val oppDots = listOf(
+                                        Pair(0.94f, 0.50f), Pair(0.05f, 0.05f), Pair(0.18f, 0.42f), Pair(0.16f, 0.52f), Pair(0.20f, 0.35f),
+                                        Pair(0.20f, 0.65f), Pair(0.28f, 0.40f), Pair(0.28f, 0.60f), Pair(0.42f, 0.30f), Pair(0.42f, 0.70f), Pair(0.60f, 0.50f)
+                                    )
+                                    userDots.forEachIndexed { i, (x, y) -> drawDot(x, y, userTeamColor, isUser = (i == 1), isGk = (i == 0)) }
+                                    oppDots.forEachIndexed { i, (x, y) -> drawDot(x, y, oppTeamColor, isUser = false, isGk = (i == 0)) }
+                                    drawTrajectory(0.05f, 0.05f, 0.18f, 0.45f)
+                                    drawBall(0.18f, 0.45f)
+                                }
+                                MomentType.GOAL_KICK_PRESSURE -> {
+                                    val userDots = listOf(
+                                        Pair(0.08f, 0.50f), Pair(0.18f, 0.22f), Pair(0.16f, 0.42f), Pair(0.16f, 0.58f), Pair(0.18f, 0.78f),
+                                        Pair(0.32f, 0.50f), Pair(0.28f, 0.32f), Pair(0.28f, 0.68f), Pair(0.50f, 0.25f), Pair(0.55f, 0.50f), Pair(0.50f, 0.75f)
+                                    )
+                                    val oppDots = listOf(
+                                        Pair(0.94f, 0.50f), Pair(0.26f, 0.42f), Pair(0.36f, 0.58f), Pair(0.35f, 0.25f), Pair(0.35f, 0.75f),
+                                        Pair(0.42f, 0.50f), Pair(0.62f, 0.20f), Pair(0.58f, 0.40f), Pair(0.58f, 0.60f), Pair(0.62f, 0.80f), Pair(0.30f, 0.50f)
+                                    )
+                                    userDots.forEachIndexed { i, (x, y) -> drawDot(x, y, userTeamColor, isUser = (i == 5), isGk = (i == 0)) }
+                                    oppDots.forEachIndexed { i, (x, y) -> drawDot(x, y, oppTeamColor, isUser = false, isGk = (i == 0)) }
+                                    drawTrajectory(0.08f, 0.50f, 0.32f, 0.50f)
+                                    drawBall(0.31f, 0.50f)
+                                }
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    // LEGEND BAR BELOW PITCH
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 6.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(
+                                modifier = Modifier
+                                    .size(10.dp)
+                                    .clip(CircleShape)
+                                    .background(userTeamColor)
+                                    .border(1.5.dp, TrophyGold, CircleShape)
+                            )
+                            Spacer(modifier = Modifier.width(5.dp))
+                            Text(
+                                text = "${myClub.name.take(12)} (You ★)",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = TrophyGold
+                            )
+                        }
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            val oppLum = oppTeamColor.red * 0.299f + oppTeamColor.green * 0.587f + oppTeamColor.blue * 0.114f
+                            val oppOutline = if (oppLum < 0.55f) Color.White else Color(0xFF111827)
+                            Box(
+                                modifier = Modifier
+                                    .size(9.dp)
+                                    .clip(CircleShape)
+                                    .background(oppTeamColor)
+                                    .border(1.dp, oppOutline, CircleShape)
+                            )
+                            Spacer(modifier = Modifier.width(5.dp))
+                            Text(
+                                text = oppClub.name.take(12),
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = TextSecondary
+                            )
+                        }
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(
+                                modifier = Modifier
+                                    .size(7.dp)
+                                    .clip(CircleShape)
+                                    .background(Color.White)
+                                    .border(1.dp, Color.Black, CircleShape)
+                            )
+                            Spacer(modifier = Modifier.width(5.dp))
+                            Text(
+                                text = "Ball ⚽",
+                                fontSize = 11.sp,
+                                color = TextSecondary.copy(alpha = 0.7f)
+                            )
                         }
                     }
 
@@ -1893,6 +2494,10 @@ fun LiveMatchSimulation(
                                     Text(text = "$playerAssistsByMe", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = PitchGreen)
                                 }
                                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Text(text = "Defense", fontSize = 11.sp, color = TextSecondary)
+                                    Text(text = "$defensiveActionsCount", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = TrophyGold)
+                                }
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                     Text(text = "Missed", fontSize = 11.sp, color = TextSecondary)
                                     Text(text = "$opportunitiesMissed", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = MutedRed)
                                 }
@@ -1902,7 +2507,7 @@ fun LiveMatchSimulation(
                             HorizontalDivider(color = BorderColor.copy(alpha = 0.3f))
                             Spacer(modifier = Modifier.height(8.dp))
 
-                            val finalRating = (6.5f + (playerGoalsScored * 1.2f) + (playerAssistsByMe * 0.8f) - (opportunitiesMissed * 0.5f)).coerceIn(1.0f, 10.0f)
+                            val finalRating = (6.5f + matchRatingDelta + (playerGoalsScored * 1.2f) + (playerAssistsByMe * 0.8f) - (opportunitiesMissed * 0.5f) + (defensiveActionsCount * 0.3f)).coerceIn(1.0f, 10.0f)
                             val ratingFormatted = "%.1f".format(finalRating)
 
                             Row(
@@ -1950,7 +2555,7 @@ fun LiveMatchSimulation(
                             val startMinute = if (playerCameOnMinute != null && playerCameOnMinute > 0) playerCameOnMinute else 0
                             val endMinute = if (wasSubbedOff) (subbedOffMinute ?: 90) else 90
                             val minutesPlayed = if (playerCameOnMinute == null) 0 else (endMinute - startMinute).coerceAtLeast(0)
-                            val finalRating = (6.5f + (playerGoalsScored * 1.2f) + (playerAssistsByMe * 0.8f) - (opportunitiesMissed * 0.5f)).coerceIn(1.0f, 10.0f)
+                            val finalRating = (6.5f + matchRatingDelta + (playerGoalsScored * 1.2f) + (playerAssistsByMe * 0.8f) - (opportunitiesMissed * 0.5f) + (defensiveActionsCount * 0.3f)).coerceIn(1.0f, 10.0f)
 
                             val gMin = if (playerGoalMinutes.isNotEmpty()) playerGoalMinutes.sorted().joinToString(",") else null
                             val aMin = if (playerAssistMinutes.isNotEmpty()) playerAssistMinutes.sorted().joinToString(",") else null

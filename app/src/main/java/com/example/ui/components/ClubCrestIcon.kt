@@ -49,6 +49,12 @@ private val CREST_PALETTES = listOf(
     Triple(Color(0xFF4A5D23), Color(0xFFF2E9DC), Color(0xFFD4AF37))  // olive / cream / gold
 )
 
+fun getClubColors(clubId: Int): Pair<Color, Color> {
+    val rng = Random(clubId)
+    val (base, secondary, _) = CREST_PALETTES[rng.nextInt(CREST_PALETTES.size)]
+    return Pair(base, secondary)
+}
+
 private enum class CrestShape { CIRCLE, SHIELD, HEXAGON, PENTAGON, ROUNDED_SQUARE }
 private enum class CrestPattern { SOLID, VERTICAL_SPLIT, HORIZONTAL_HALVES, DIAGONAL_SPLIT, QUARTERED }
 private enum class CrestEmblem { STAR, CHEVRON, DIAMOND_BALL, TREE, WREATH_BAR, RING, CROSS, ARCH }
