@@ -7,7 +7,9 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.ui.dialogs.*
 import com.example.ui.screens.*
@@ -40,6 +42,21 @@ fun MainGameScreen(viewModel: CareerViewModel) {
         }
 
         if (isSimulatingSeason) {
+            var currentTip by remember { mutableStateOf<String?>(null) }
+
+            LaunchedEffect(isSimulatingSeason) {
+                currentTip = null
+                val order = com.example.ui.components.LoadingTips.newSessionOrder()
+                if (order.isEmpty()) return@LaunchedEffect
+                var i = 0
+                kotlinx.coroutines.delay(5000L) // only show a tip if the load is still running after 5s
+                while (true) {
+                    currentTip = com.example.ui.components.LoadingTips.tipAt(order[i % order.size])
+                    i++
+                    kotlinx.coroutines.delay(4500L) // rotate to a new tip if the load keeps going
+                }
+            }
+
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -47,11 +64,24 @@ fun MainGameScreen(viewModel: CareerViewModel) {
                     .clickable(enabled = true, onClick = {}),
                 contentAlignment = Alignment.Center
             ) {
-                CircularProgressIndicator(
-                    color = PitchGreen,
-                    strokeWidth = 4.dp,
-                    modifier = Modifier.size(64.dp)
-                )
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    CircularProgressIndicator(
+                        color = PitchGreen,
+                        strokeWidth = 4.dp,
+                        modifier = Modifier.size(64.dp)
+                    )
+                    currentTip?.let { tip ->
+                        Spacer(modifier = Modifier.height(14.dp))
+                        Text(
+                            text = tip,
+                            fontSize = 10.sp,
+                            color = MutedGrey,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier
+                                .fillMaxWidth(0.7f)
+                        )
+                    }
+                }
             }
         }
 

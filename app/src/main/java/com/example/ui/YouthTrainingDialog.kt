@@ -1,5 +1,6 @@
 package com.example.ui
 
+import com.example.ui.components.drawTacticalPitch
 import com.example.ui.theme.*
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
@@ -485,20 +486,8 @@ fun ShootingDrillCanvas(onComplete: (Float) -> Unit) {
                 canvasSize = size
             }
 
-            // Pitch & Goal area
-            drawRect(
-                brush = Brush.verticalGradient(
-                    colors = listOf(Color(0xFF1B4332), Color(0xFF0F2A1E))
-                )
-            )
-            val stripeHeight = height / 8f
-            for (i in 0..7 step 2) {
-                drawRect(
-                    color = Color.White.copy(alpha = 0.04f),
-                    topLeft = Offset(0f, i * stripeHeight),
-                    size = Size(width, stripeHeight)
-                )
-            }
+            // Pitch background (shared tactical pitch, matches Key Moment view)
+            drawTacticalPitch()
 
             val goalLeft = width * 0.15f
             val goalRight = width * 0.85f
@@ -673,20 +662,8 @@ fun PassingDrillCanvas(onComplete: (Float) -> Unit) {
                 canvasSize = size
             }
 
-            // Pitch & Grid lines
-            drawRect(
-                brush = Brush.verticalGradient(
-                    colors = listOf(Color(0xFF1B4332), Color(0xFF0F2A1E))
-                )
-            )
-            val stripeHeight = height / 8f
-            for (i in 0..7 step 2) {
-                drawRect(
-                    color = Color.White.copy(alpha = 0.04f),
-                    topLeft = Offset(0f, i * stripeHeight),
-                    size = Size(width, stripeHeight)
-                )
-            }
+            // Pitch background (shared tactical pitch, matches Key Moment view)
+            drawTacticalPitch()
 
             // Target Post
             if (targetOffset == null) {
@@ -960,6 +937,7 @@ fun TechnicalDrillCanvas(onComplete: (Float) -> Unit) {
             if (canvasSize != size) {
                 canvasSize = size
             }
+            drawTacticalPitch()
             @Suppress("UNUSED_VARIABLE")
             val tick = frameTick
             // Draw obstacles
@@ -975,6 +953,52 @@ fun TechnicalDrillCanvas(onComplete: (Float) -> Unit) {
     }
 }
 
+private data class PopBurst(val id: Int, val offset: IntOffset)
+
+@Composable
+private fun PopBurstEffect(burst: PopBurst, onFinished: (Int) -> Unit) {
+    val progress = remember { androidx.compose.animation.core.Animatable(0f) }
+
+    LaunchedEffect(burst.id) {
+        progress.animateTo(1f, animationSpec = tween(320))
+        onFinished(burst.id)
+    }
+
+    Box(
+        modifier = Modifier
+            .offset { burst.offset }
+            .size(84.dp)
+    ) {
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val t = progress.value
+            val center = Offset(size.width / 2f, size.height / 2f)
+            val alpha = (1f - t).coerceIn(0f, 1f)
+
+            // Expanding ring
+            drawCircle(
+                color = Color(0xFFA855F7).copy(alpha = alpha * 0.6f),
+                radius = size.minDimension / 2f * (0.5f + t * 0.8f),
+                center = center,
+                style = Stroke(width = 4f)
+            )
+
+            // Radiating shard particles
+            val shardCount = 8
+            val shardDist = (size.minDimension / 2f) * (0.4f + t * 1.1f)
+            for (i in 0 until shardCount) {
+                val angle = (2 * Math.PI * i / shardCount).toFloat()
+                val px = center.x + shardDist * kotlin.math.cos(angle)
+                val py = center.y + shardDist * kotlin.math.sin(angle)
+                drawCircle(
+                    color = Color.White.copy(alpha = alpha),
+                    radius = 4f * (1f - t) + 1f,
+                    center = Offset(px, py)
+                )
+            }
+        }
+    }
+}
+
 // 5. Physical Drill Canvas
 @Composable
 fun PhysicalDrillCanvas(onComplete: (Float) -> Unit) {
@@ -985,6 +1009,8 @@ fun PhysicalDrillCanvas(onComplete: (Float) -> Unit) {
 
     val buttonAlpha = remember { androidx.compose.animation.core.Animatable(0f) }
     var currentPopTapped by remember { mutableStateOf(false) }
+    val bursts = remember { mutableStateListOf<PopBurst>() }
+    var burstIdCounter by remember { mutableIntStateOf(0) }
 
     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
         val maxWidthPx = constraints.maxWidth.toFloat()
@@ -1031,6 +1057,8 @@ fun PhysicalDrillCanvas(onComplete: (Float) -> Unit) {
                             detectTapGestures {
                                 currentPopTapped = true
                                 popCount++
+                                burstIdCounter++
+                                bursts.add(PopBurst(burstIdCounter, buttonOffset!!))
                             }
                         }
                     },
@@ -1053,5 +1081,11 @@ fun PhysicalDrillCanvas(onComplete: (Float) -> Unit) {
                 .align(Alignment.BottomCenter)
                 .padding(12.dp)
         )
+
+        bursts.forEach { burst ->
+            PopBurstEffect(burst = burst, onFinished = { finishedId ->
+                bursts.removeAll { it.id == finishedId }
+            })
+        }
     }
 }

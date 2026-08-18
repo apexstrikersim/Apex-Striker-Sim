@@ -96,7 +96,7 @@ fun MainMenuScreen(viewModel: CareerViewModel) {
                     border = androidx.compose.foundation.BorderStroke(1.dp, BorderColor)
                 ) {
                     Text(
-                        text = "v2.4.0",
+                        text = "v2.4.1",
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
                         color = TrophyGold,

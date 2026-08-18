@@ -746,7 +746,7 @@ fun SettingsDialog(viewModel: CareerViewModel, gameState: GameStateEntity?) {
                 item {
                     Spacer(modifier = Modifier.height(10.dp))
                     Text(
-                        text = "Version 2.4.0 (Striker Edition)",
+                        text = "Version 2.4.1 (Striker Edition)",
                         fontSize = 11.sp,
                         color = TextSecondary,
                         textAlign = TextAlign.Center,
