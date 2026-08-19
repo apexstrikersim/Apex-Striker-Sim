@@ -1,5 +1,8 @@
 package com.example.ui
 
+import com.example.ui.components.drawObstacleDrillBackground
+import com.example.ui.components.drawPassingDrillBackground
+import com.example.ui.components.drawShootingDrillBackground
 import com.example.ui.components.drawTacticalPitch
 import com.example.ui.theme.*
 import androidx.compose.animation.core.Animatable
@@ -443,22 +446,33 @@ fun ShootingDrillCanvas(onComplete: (Float) -> Unit) {
                         val curr = dragCurrent
                         val h = if (canvasSize.height > 0) canvasSize.height else 500f
                         val w = if (canvasSize.width > 0) canvasSize.width else 300f
-                        val bPos = animatedBallPos ?: Offset(w * 0.5f, h * 0.60f)
+                        val bPos = Offset(w * 0.5f, h * 0.60f)
+
+                        val goalLeft = w * 0.15f
+                        val goalTop = h * 0.10f
 
                         if (start != null && curr != null && targetOffset != null) {
                             val rawVector = start - curr
                             val rawLen = hypot(rawVector.x, rawVector.y)
-                            if (rawLen > 10f) {
-                                val maxDragLen = (h * 0.42f).coerceIn(220f, 420f)
-                                val powerRatio = (rawLen / maxDragLen).coerceIn(0.1f, 1.0f)
-                                val maxTravelDist = h * 0.48f
-                                val shotTarget = bPos + Offset(rawVector.x / rawLen, rawVector.y / rawLen) * (powerRatio * maxTravelDist)
+                            if (rawLen > 8f) {
+                                // Smooth drag sensitivity (longer travel for fine precision)
+                                val maxDragLen = (h * 0.42f).coerceIn(240f, 400f)
+                                val power = (rawLen / maxDragLen).coerceIn(0.08f, 1.0f)
+                                
+                                val forwardY = if (rawVector.y < 0f) rawVector.y else -0.1f
+                                val normLen = hypot(rawVector.x, forwardY)
+                                val unitX = rawVector.x / normLen
+                                val unitY = forwardY / normLen
+
+                                // Reach distance calibrated to naturally reach the top corners of the goal without artificial clamp borders
+                                val cornerReachDist = hypot(w * 0.35f, h * 0.50f) * 1.06f
+                                val travelDist = power * cornerReachDist
+                                val shotTarget = bPos + Offset(unitX * travelDist, unitY * travelDist)
 
                                 shotTaken = true
 
                                 val targetDist = hypot(shotTarget.x - targetOffset!!.x, shotTarget.y - targetOffset!!.y)
-                                val closeness = (1f - (targetDist / 180f)).coerceIn(0.1f, 1f)
-                                val score = closeness
+                                val score = if (targetDist <= 40f) 1.0f else (1.0f - (targetDist - 40f) / 110f).coerceIn(0.1f, 1.0f)
 
                                 coroutineScope.launch {
                                     val steps = 18
@@ -486,91 +500,123 @@ fun ShootingDrillCanvas(onComplete: (Float) -> Unit) {
                 canvasSize = size
             }
 
-            // Pitch background (shared tactical pitch, matches Key Moment view)
-            drawTacticalPitch()
-
             val goalLeft = width * 0.15f
             val goalRight = width * 0.85f
             val goalTop = height * 0.10f
             val goalBottom = height * 0.28f
 
-            drawRect(
-                color = Color.White,
-                topLeft = Offset(goalLeft, goalTop),
-                size = Size(goalRight - goalLeft, goalBottom - goalTop),
-                style = Stroke(width = 4f)
+            val ballInitialPos = Offset(width * 0.5f, height * 0.60f)
+
+            // Dedicated Finishing Ground & Goalmouth Background with ball placed on Penalty Spot
+            drawShootingDrillBackground(
+                goalLeft = goalLeft,
+                goalRight = goalRight,
+                goalTop = goalTop,
+                goalBottom = goalBottom,
+                penaltySpot = ballInitialPos
             )
 
-            // Highlighted Target Zone
+            // Highlighted Target Zone (spawned safely where ball can reach with 100% accuracy)
             if (targetOffset == null) {
-                val targetX = goalLeft + 40f + Random.nextFloat() * (goalRight - goalLeft - 80f)
-                val targetY = goalTop + 40f + Random.nextFloat() * (goalBottom - goalTop - 60f)
+                val paddingX = 36f
+                val paddingY = 24f
+                val targetX = goalLeft + paddingX + Random.nextFloat() * (goalRight - goalLeft - 2 * paddingX)
+                val targetY = goalTop + paddingY + Random.nextFloat() * (goalBottom - goalTop - 2 * paddingY)
                 targetOffset = Offset(targetX, targetY)
             }
 
+            // Target Rings
             drawCircle(
                 color = CoralRed.copy(alpha = 0.25f),
-                radius = 48f,
+                radius = 38f,
                 center = targetOffset!!
             )
             drawCircle(
-                color = CoralRed.copy(alpha = 0.8f),
-                radius = 32f,
+                color = CoralRed.copy(alpha = 0.85f),
+                radius = 24f,
                 center = targetOffset!!
             )
             drawCircle(
                 color = Color.White,
-                radius = 12f,
+                radius = 10f,
                 center = targetOffset!!
             )
 
-            // Ball position placed safely in mid-lower section
-            val bPos = animatedBallPos ?: Offset(width * 0.5f, height * 0.60f)
+            // Ball position placed safely on top of penalty spot
+            val bPos = animatedBallPos ?: ballInitialPos
             if (animatedBallPos == null) {
                 animatedBallPos = bPos
             }
 
+            // Ball shadow on turf
+            drawCircle(
+                color = Color.Black.copy(alpha = 0.35f),
+                radius = 16f,
+                center = Offset(bPos.x + 2f, bPos.y + 3f)
+            )
+
+            // Football Graphic
             drawCircle(
                 brush = Brush.radialGradient(
-                    colors = listOf(Color.White, Color(0xFFDDDDDD)),
-                    center = bPos,
+                    colors = listOf(Color.White, Color(0xFFE2E8F0)),
+                    center = Offset(bPos.x - 4f, bPos.y - 4f),
                     radius = 16f
                 ),
                 radius = 16f,
                 center = bPos
             )
             drawCircle(
-                color = Color.Black.copy(alpha = 0.25f),
+                color = Color(0xFF1E293B),
                 radius = 16f,
                 center = bPos,
                 style = Stroke(width = 2f)
             )
+            // Center pentagon patch
+            drawCircle(
+                color = Color(0xFF1E293B),
+                radius = 4.5f,
+                center = bPos
+            )
 
-            // Visual Aiming Line
+            // Visual Aiming Line (Smooth sensitivity, reaches top corners naturally without artificial side borders)
             val start = dragStart
             val curr = dragCurrent
             if (start != null && curr != null && !shotTaken) {
                 val rawVector = start - curr
                 val rawLen = hypot(rawVector.x, rawVector.y)
-                if (rawLen > 5f) {
-                    val maxDragLen = (height * 0.42f).coerceIn(220f, 420f)
-                    val powerRatio = (rawLen / maxDragLen).coerceIn(0.1f, 1.0f)
-                    val maxTravelDist = height * 0.48f
-                    val aimTarget = bPos + Offset(rawVector.x / rawLen, rawVector.y / rawLen) * (powerRatio * maxTravelDist)
+                if (rawLen > 6f) {
+                    val maxDragLen = (height * 0.42f).coerceIn(240f, 400f)
+                    val power = (rawLen / maxDragLen).coerceIn(0.08f, 1.0f)
+                    
+                    val forwardY = if (rawVector.y < 0f) rawVector.y else -0.1f
+                    val normLen = hypot(rawVector.x, forwardY)
+                    val unitX = rawVector.x / normLen
+                    val unitY = forwardY / normLen
 
+                    val cornerReachDist = hypot(width * 0.35f, height * 0.50f) * 1.06f
+                    val travelDist = power * cornerReachDist
+                    val aimTarget = ballInitialPos + Offset(unitX * travelDist, unitY * travelDist)
+
+                    // Trajectory Line
                     drawLine(
                         brush = Brush.linearGradient(
-                            colors = listOf(GoldStar.copy(alpha = 0.4f), GoldStar),
-                            start = bPos,
+                            colors = listOf(GoldStar.copy(alpha = 0.35f), GoldStar),
+                            start = ballInitialPos,
                             end = aimTarget
                         ),
-                        start = bPos,
+                        start = ballInitialPos,
                         end = aimTarget,
-                        strokeWidth = 6f
+                        strokeWidth = 4.5f
+                    )
+                    // Aim Reticle / Crosshair Indicator at the tip
+                    drawCircle(
+                        color = GoldStar.copy(alpha = 0.25f),
+                        radius = 16f,
+                        center = aimTarget
                     )
                     drawCircle(
                         color = GoldStar,
-                        radius = 10f,
+                        radius = 6f,
                         center = aimTarget
                     )
                 }
@@ -578,7 +624,7 @@ fun ShootingDrillCanvas(onComplete: (Float) -> Unit) {
         }
 
         Text(
-            text = "Drag BACK slightly to aim & release to shoot!",
+            text = "Drag BACK to aim & release to shoot into the target!",
             fontSize = 12.sp,
             color = TextSecondary,
             modifier = Modifier
@@ -662,8 +708,8 @@ fun PassingDrillCanvas(onComplete: (Float) -> Unit) {
                 canvasSize = size
             }
 
-            // Pitch background (shared tactical pitch, matches Key Moment view)
-            drawTacticalPitch()
+            // Dedicated Midfield Rondo & Passing Grid Background
+            drawPassingDrillBackground()
 
             // Target Post
             if (targetOffset == null) {
@@ -937,7 +983,8 @@ fun TechnicalDrillCanvas(onComplete: (Float) -> Unit) {
             if (canvasSize != size) {
                 canvasSize = size
             }
-            drawTacticalPitch()
+            // Dedicated Agility Slalom Gauntlet Course Background
+            drawObstacleDrillBackground()
             @Suppress("UNUSED_VARIABLE")
             val tick = frameTick
             // Draw obstacles

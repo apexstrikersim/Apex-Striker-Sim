@@ -1,5 +1,6 @@
 package com.example.ui
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -26,6 +27,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -46,6 +48,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.data.SocialPostEntity
 import com.example.ui.theme.BorderColor
+import com.example.ui.theme.CoralRed
 import com.example.ui.theme.DarkSlate
 import com.example.ui.theme.MutedBlue
 import com.example.ui.theme.PitchGreen
@@ -63,9 +66,6 @@ fun SocialMediaScreen(viewModel: CareerViewModel) {
     val clubs by viewModel.clubsFlow.collectAsStateWithLifecycle()
     val socialPosts by viewModel.socialPostsFlow.collectAsStateWithLifecycle()
     val isPlayerOnly by viewModel.isSocialFeedPlayerOnly.collectAsState()
-
-    val snackbarHostState = remember { SnackbarHostState() }
-    val scope = rememberCoroutineScope()
 
     val currentClub = remember(clubs, player) {
         clubs.find { it.id == player?.currentClubId }
@@ -88,8 +88,7 @@ fun SocialMediaScreen(viewModel: CareerViewModel) {
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
-        containerColor = SportsDarkBg,
-        snackbarHost = { SnackbarHost(snackbarHostState) }
+        containerColor = SportsDarkBg
     ) { innerPadding ->
         Column(
             modifier = Modifier
@@ -173,13 +172,7 @@ fun SocialMediaScreen(viewModel: CareerViewModel) {
                             post = post,
                             playerInitials = player?.name?.take(2)?.uppercase() ?: "ME",
                             onReplySelected = { replyIndex ->
-                                viewModel.submitSocialPostReply(post, replyIndex) { statMessage ->
-                                    if (statMessage.isNotBlank()) {
-                                        scope.launch {
-                                            snackbarHostState.showSnackbar(statMessage)
-                                        }
-                                    }
-                                }
+                                viewModel.submitSocialPostReply(post, replyIndex) { /* effects applied silently */ }
                             }
                         )
                     }
@@ -308,13 +301,24 @@ fun SocialPostCard(
             Spacer(modifier = Modifier.weight(1f))
 
             if (post.isReplyable && !post.hasReplied) {
-                Text(
-                    text = if (isReplying) "Cancel" else "Reply",
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = PitchGreen,
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = PitchGreen.copy(alpha = if (isReplying) 0.3f else 0.15f),
+                    border = BorderStroke(1.dp, PitchGreen.copy(alpha = 0.5f)),
                     modifier = Modifier.clickable { isReplying = !isReplying }
-                )
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = if (isReplying) "Cancel ✕" else "💬 Reply (${listOfNotNull(post.reply1Text, post.reply2Text, post.reply3Text).size})",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = PitchGreen
+                        )
+                    }
+                }
             }
         }
 
@@ -328,38 +332,44 @@ fun SocialPostCard(
             }
             if (!chosenText.isNullOrBlank()) {
                 Spacer(modifier = Modifier.height(8.dp))
-                Row(
+                Column(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(8.dp))
                         .background(DarkSlate.copy(alpha = 0.6f))
                         .border(1.dp, PitchGreen.copy(alpha = 0.4f), RoundedCornerShape(8.dp))
-                        .padding(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                        .padding(8.dp)
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .size(20.dp)
-                            .clip(CircleShape)
-                            .background(DarkSlate)
-                            .border(1.dp, PitchGreen, CircleShape),
-                        contentAlignment = Alignment.Center
-                    ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            modifier = Modifier
+                                .size(20.dp)
+                                .clip(CircleShape)
+                                .background(DarkSlate)
+                                .border(1.dp, PitchGreen, CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = playerInitials,
+                                fontSize = 8.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = PitchGreen
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            text = playerInitials,
-                            fontSize = 8.sp,
-                            fontWeight = FontWeight.Bold,
+                            text = "Your Reply",
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.SemiBold,
                             color = PitchGreen
                         )
                     }
-                    Spacer(modifier = Modifier.width(6.dp))
+                    Spacer(modifier = Modifier.height(4.dp))
                     Text(
                         text = chosenText,
                         fontSize = 11.sp,
                         fontStyle = FontStyle.Italic,
-                        color = TextSecondary,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
+                        color = TextPrimary
                     )
                 }
             }
@@ -367,7 +377,14 @@ fun SocialPostCard(
 
         // Reply Options Expansion
         if (isReplying && !post.hasReplied) {
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(10.dp))
+            Text(
+                text = "Choose your response:",
+                fontSize = 11.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = TextSecondary
+            )
+            Spacer(modifier = Modifier.height(6.dp))
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 val replies = listOfNotNull(
                     post.reply1Text?.takeIf { it.isNotBlank() }?.let { 1 to it },
@@ -380,12 +397,12 @@ fun SocialPostCard(
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(8.dp))
                             .background(DarkSlate)
-                            .border(1.dp, BorderColor, RoundedCornerShape(8.dp))
+                            .border(1.dp, PitchGreen.copy(alpha = 0.35f), RoundedCornerShape(8.dp))
                             .clickable {
                                 isReplying = false
                                 onReplySelected(index)
                             }
-                            .padding(horizontal = 10.dp, vertical = 8.dp)
+                            .padding(horizontal = 12.dp, vertical = 10.dp)
                     ) {
                         Text(
                             text = text,

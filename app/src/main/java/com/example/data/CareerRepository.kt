@@ -5077,101 +5077,16 @@ private suspend fun adjustClubsReputations(standings: List<StandingEntity>, club
                 }
 
                 // Player specific post if allowed
-                allowPlayerPost && (roll < 0.60f || i == 0 && maxPlayerPosts > 0) -> {
+                allowPlayerPost && (roll < 0.65f || i == 0 && maxPlayerPosts > 0) -> {
                     playerPostsAdded++
+                    val isInteractiveReply = rng.nextFloat() < 0.55f || (playerPostsAdded == 1)
                     when (phase) {
                         PHASE_STREET -> {
-                            val streetTemplates = listOf(
-                                "@${player.name} from the cages putting in work 👊",
-                                "Local cage rat ${player.name} bagging braces again — someone's getting scouted soon.",
-                                "Street report: ${player.name} ($age) running riot in the back alleys.",
-                                "Cage highlight: ${player.name}'s footwork in the 3v3 tournament was ridiculous 🔥"
-                            )
                             val (name, handle, init) = citizenAuthors[rng.nextInt(citizenAuthors.size)]
-                            SocialPostEntity(
-                                sequenceIndex = currentSeq,
-                                seasonNumber = gameState.currentSeason,
-                                monthIndex = gameState.currentMonthIndex,
-                                postType = "CITIZEN",
-                                authorName = name,
-                                authorHandle = handle,
-                                authorInitials = init,
-                                content = streetTemplates[rng.nextInt(streetTemplates.size)],
-                                isAboutPlayerOrClub = true,
-                                relatedClubId = null,
-                                likeCount = scaledLikeCount(rng, 50, 800, 0.3f, player)
-                            )
-                        }
-
-                        PHASE_YOUTH -> {
-                            val (name, handle, init) = punditAuthors[rng.nextInt(punditAuthors.size)]
-                            val youthContent = when {
-                                form >= 3 -> listOf(
-                                    "⚡ ${player.name} on fire! Youth PL Player of the Month nominee.",
-                                    "${player.name} is the standout name in the U18s right now — scouts are noticing.",
-                                    "Can't stop, won't stop: ${player.name} is tearing up the youth league this month."
-                                ).random(rng)
-                                form <= -3 -> listOf(
-                                    "${player.name} benched — academy coaches demand answers.",
-                                    "Rough patch for ${player.name}, who's lost his place in the U18s starting XI.",
-                                    "Whispers from the academy: is ${player.name} losing his edge?"
-                                ).random(rng)
-                                else -> listOf(
-                                    "${player.name} holding down a starting spot in U18s.",
-                                    "Steady week for ${player.name} in the academy setup — no fireworks, no drama.",
-                                    "${player.name} putting in the reps at U18 level, building toward a breakthrough.",
-                                    "Academy report: ${player.name} remains a fixture in the U18s XI.",
-                                    "Nothing flashy, just consistent minutes for ${player.name} in the youth ranks."
-                                ).random(rng)
-                            }
-                            SocialPostEntity(
-                                sequenceIndex = currentSeq,
-                                seasonNumber = gameState.currentSeason,
-                                monthIndex = gameState.currentMonthIndex,
-                                postType = "PUNDIT",
-                                authorName = name,
-                                authorHandle = handle,
-                                authorInitials = init,
-                                content = youthContent,
-                                isAboutPlayerOrClub = true,
-                                relatedClubId = club?.id,
-                                likeCount = scaledLikeCount(rng, 200, 3500, 0.5f, player)
-                            )
-                        }
-
-                        PHASE_SENIOR -> {
-                            when {
-                                age < 24 && ovr < 75 -> {
-                                    val youngTemplates = listOf(
-                                        "Young ${player.name} making strides at $clubName.",
-                                        "${player.name} ($age) earning late substitute minutes.",
-                                        "Developing talent: ${player.name} showing encouraging glimpses of potential."
-                                    )
-                                    val (name, handle, init) = influencerAuthors[rng.nextInt(influencerAuthors.size)]
-                                    SocialPostEntity(
-                                        sequenceIndex = currentSeq,
-                                        seasonNumber = gameState.currentSeason,
-                                        monthIndex = gameState.currentMonthIndex,
-                                        postType = "INFLUENCER",
-                                        authorName = name,
-                                        authorHandle = handle,
-                                        authorInitials = init,
-                                        content = youngTemplates[rng.nextInt(youngTemplates.size)],
-                                        isAboutPlayerOrClub = true,
-                                        relatedClubId = club?.id,
-                                        likeCount = scaledLikeCount(rng, 1000, 12000, 1.0f, player)
-                                    )
-                                }
-
-                                age in 27..35 && (form <= -3 || managerTrust < 30) -> {
-                                    val isCritical = rng.nextFloat() < 0.35f
-                                    val (name, handle, init) = citizenAuthors[rng.nextInt(citizenAuthors.size)]
-                                    if (isCritical) {
-                                        val critContent = listOf(
-                                            "Fans turning on ${player.name} after that performance.",
-                                            "${player.name}'s miss costs $clubName a point.",
-                                            "Past his prime? ${player.name} ($age) benched again."
-                                        )[rng.nextInt(3)]
+                            if (isInteractiveReply) {
+                                val replyVariant = rng.nextInt(3)
+                                when (replyVariant) {
+                                    0 -> {
                                         SocialPostEntity(
                                             sequenceIndex = currentSeq,
                                             seasonNumber = gameState.currentSeason,
@@ -5180,23 +5095,106 @@ private suspend fun adjustClubsReputations(standings: List<StandingEntity>, club
                                             authorName = name,
                                             authorHandle = handle,
                                             authorInitials = init,
-                                            content = critContent,
+                                            content = "Cage talk: Rival crew says ${player.name} is all flash and no end product. Can he back it up on Friday?",
                                             isAboutPlayerOrClub = true,
-                                            relatedClubId = club?.id,
-                                            likeCount = scaledLikeCount(rng, 500, 8000, 1.0f, player),
+                                            relatedClubId = null,
+                                            likeCount = scaledLikeCount(rng, 100, 1200, 0.4f, player),
                                             isReplyable = true,
-                                            reply1Text = "Claps back: 'Keep watching, working hard every day.'",
-                                            reply1FanRepMod = 4,
-                                            reply1MoraleMod = 2,
-                                            reply1ManagerTrustMod = -1,
-                                            reply2Text = "Stays classy: 'We win and learn together as a team.'",
-                                            reply2MoraleMod = 3,
-                                            reply2FanRepMod = 1,
-                                            reply2ManagerTrustMod = 3,
-                                            reply3Text = "Ignores it",
-                                            reply3MoraleMod = 0
+                                            reply1Text = "Fiery: 'Drop the location. I'll drop you again.'",
+                                            reply1FanRepMod = 5,
+                                            reply1MoraleMod = 3,
+                                            reply1RivalRelMod = -4,
+                                            reply2Text = "Confident: 'Game speaks for itself. See you on the asphalt.'",
+                                            reply2FanRepMod = 3,
+                                            reply2MoraleMod = 2,
+                                            reply2ManagerTrustMod = 2,
+                                            reply3Text = "Dismissive: 'Who even are you?'",
+                                            reply3FanRepMod = 2,
+                                            reply3RivalRelMod = -2
                                         )
-                                    } else {
+                                    }
+                                    1 -> {
+                                        SocialPostEntity(
+                                            sequenceIndex = currentSeq,
+                                            seasonNumber = gameState.currentSeason,
+                                            monthIndex = gameState.currentMonthIndex,
+                                            postType = "INFLUENCER",
+                                            authorName = "Street Scout",
+                                            authorHandle = "@StreetScoutDaily",
+                                            authorInitials = "SS",
+                                            content = "Word on the concrete: @${player.name} ($age) has academy scouts watching the cages. Is he ready for pro football?",
+                                            isAboutPlayerOrClub = true,
+                                            relatedClubId = null,
+                                            likeCount = scaledLikeCount(rng, 300, 2500, 0.6f, player),
+                                            isReplyable = true,
+                                            reply1Text = "Ambitious: 'Ready and hungry. Time to prove it.'",
+                                            reply1MoraleMod = 4,
+                                            reply1FanRepMod = 4,
+                                            reply1ManagerTrustMod = 3,
+                                            reply2Text = "Grounded: 'One step at a time, working in the shadows.'",
+                                            reply2ManagerTrustMod = 5,
+                                            reply2MoraleMod = 2,
+                                            reply3Text = "Team First: 'Credit to the crew holding it down with me.'",
+                                            reply3FanRepMod = 4,
+                                            reply3MoraleMod = 3
+                                        )
+                                    }
+                                    else -> {
+                                        SocialPostEntity(
+                                            sequenceIndex = currentSeq,
+                                            seasonNumber = gameState.currentSeason,
+                                            monthIndex = gameState.currentMonthIndex,
+                                            postType = "CITIZEN",
+                                            authorName = name,
+                                            authorHandle = handle,
+                                            authorInitials = init,
+                                            content = "That nutmeg from ${player.name} in the 3v3 semifinal broke the local internet 🔥",
+                                            isAboutPlayerOrClub = true,
+                                            relatedClubId = null,
+                                            likeCount = scaledLikeCount(rng, 150, 1800, 0.5f, player),
+                                            isReplyable = true,
+                                            reply1Text = "Humble: 'Just having fun out there with the squad!'",
+                                            reply1FanRepMod = 4,
+                                            reply1MoraleMod = 3,
+                                            reply2Text = "Bold: 'Just getting warmed up.'",
+                                            reply2FanRepMod = 5,
+                                            reply2MoraleMod = 4,
+                                            reply2RivalRelMod = -2,
+                                            reply3Text = "Laughs: 'Had to do it to him 😂'",
+                                            reply3FanRepMod = 3,
+                                            reply3MoraleMod = 2
+                                        )
+                                    }
+                                }
+                            } else {
+                                val streetTemplates = listOf(
+                                    "@${player.name} from the cages putting in work 👊",
+                                    "Local cage rat ${player.name} bagging braces again — someone's getting scouted soon.",
+                                    "Street report: ${player.name} ($age) running riot in the back alleys.",
+                                    "Cage highlight: ${player.name}'s footwork in the 3v3 tournament was ridiculous 🔥"
+                                )
+                                SocialPostEntity(
+                                    sequenceIndex = currentSeq,
+                                    seasonNumber = gameState.currentSeason,
+                                    monthIndex = gameState.currentMonthIndex,
+                                    postType = "CITIZEN",
+                                    authorName = name,
+                                    authorHandle = handle,
+                                    authorInitials = init,
+                                    content = streetTemplates[rng.nextInt(streetTemplates.size)],
+                                    isAboutPlayerOrClub = true,
+                                    relatedClubId = null,
+                                    likeCount = scaledLikeCount(rng, 50, 800, 0.3f, player)
+                                )
+                            }
+                        }
+
+                        PHASE_YOUTH -> {
+                            val (name, handle, init) = punditAuthors[rng.nextInt(punditAuthors.size)]
+                            if (isInteractiveReply) {
+                                val youthVar = rng.nextInt(3)
+                                when (youthVar) {
+                                    0 -> {
                                         SocialPostEntity(
                                             sequenceIndex = currentSeq,
                                             seasonNumber = gameState.currentSeason,
@@ -5205,62 +5203,367 @@ private suspend fun adjustClubsReputations(standings: List<StandingEntity>, club
                                             authorName = name,
                                             authorHandle = handle,
                                             authorInitials = init,
-                                            content = "${player.name} under pressure to deliver for $clubName next match.",
+                                            content = "Youth Scout Analysis: ${player.name} shows immense striking instinct, but academy staff want to see more tactical maturity.",
                                             isAboutPlayerOrClub = true,
                                             relatedClubId = club?.id,
-                                            likeCount = scaledLikeCount(rng, 1500, 15000, 1.1f, player)
+                                            likeCount = scaledLikeCount(rng, 500, 4500, 0.8f, player),
+                                            isReplyable = true,
+                                            reply1Text = "Professional: 'Studying film and working with coaches every day.'",
+                                            reply1ManagerTrustMod = 6,
+                                            reply1MoraleMod = 2,
+                                            reply2Text = "Defiant: 'Goals win games. That is what I bring.'",
+                                            reply2FanRepMod = 4,
+                                            reply2MoraleMod = 3,
+                                            reply2ManagerTrustMod = -2,
+                                            reply3Text = "Humble: 'Always learning, always improving.'",
+                                            reply3ManagerTrustMod = 4,
+                                            reply3FanRepMod = 3,
+                                            reply3MoraleMod = 2
+                                        )
+                                    }
+                                    1 -> {
+                                        SocialPostEntity(
+                                            sequenceIndex = currentSeq,
+                                            seasonNumber = gameState.currentSeason,
+                                            monthIndex = gameState.currentMonthIndex,
+                                            postType = "INFLUENCER",
+                                            authorName = "Academy Tracker",
+                                            authorHandle = "@AcademyTracker",
+                                            authorInitials = "AT",
+                                            content = "Big Youth Derby this week! Will ${player.name} handle the pressure against their biggest rivals?",
+                                            isAboutPlayerOrClub = true,
+                                            relatedClubId = club?.id,
+                                            likeCount = scaledLikeCount(rng, 800, 6000, 0.9f, player),
+                                            isReplyable = true,
+                                            reply1Text = "Fired up: 'Derby days are made for big moments. Let's get it!'",
+                                            reply1FanRepMod = 6,
+                                            reply1MoraleMod = 4,
+                                            reply1RivalRelMod = -4,
+                                            reply2Text = "Composed: 'Preparation is done. Time to execute on the pitch.'",
+                                            reply2ManagerTrustMod = 4,
+                                            reply2MoraleMod = 3,
+                                            reply2FanRepMod = 2,
+                                            reply3Text = "Team First: 'We fight together for the crest.'",
+                                            reply3ManagerTrustMod = 5,
+                                            reply3FanRepMod = 4,
+                                            reply3MoraleMod = 3
+                                        )
+                                    }
+                                    else -> {
+                                        SocialPostEntity(
+                                            sequenceIndex = currentSeq,
+                                            seasonNumber = gameState.currentSeason,
+                                            monthIndex = gameState.currentMonthIndex,
+                                            postType = "CITIZEN",
+                                            authorName = "YouthFan_10",
+                                            authorHandle = "@YouthFan_10",
+                                            authorInitials = "YF",
+                                            content = "Is ${player.name} the most exciting striker in the academy right now? Thoughts?",
+                                            isAboutPlayerOrClub = true,
+                                            relatedClubId = club?.id,
+                                            likeCount = scaledLikeCount(rng, 400, 3500, 0.7f, player),
+                                            isReplyable = true,
+                                            reply1Text = "Grateful: 'Thank you for the support, means the world!'",
+                                            reply1FanRepMod = 5,
+                                            reply1MoraleMod = 3,
+                                            reply2Text = "Hungry: 'This is just the foundation. More to come.'",
+                                            reply2MoraleMod = 4,
+                                            reply2FanRepMod = 4,
+                                            reply2ManagerTrustMod = 2,
+                                            reply3Text = "Modest: 'We have so many talents here pushing each other.'",
+                                            reply3ManagerTrustMod = 4,
+                                            reply3FanRepMod = 3
+                                        )
+                                    }
+                                }
+                            } else {
+                                val youthContent = when {
+                                    form >= 3 -> listOf(
+                                        "⚡ ${player.name} on fire! Youth PL Player of the Month nominee.",
+                                        "${player.name} is the standout name in the U18s right now — scouts are noticing.",
+                                        "Can't stop, won't stop: ${player.name} is tearing up the youth league this month."
+                                    ).random(rng)
+                                    form <= -3 -> listOf(
+                                        "${player.name} benched — academy coaches demand answers.",
+                                        "Rough patch for ${player.name}, who's lost his place in the U18s starting XI.",
+                                        "Whispers from the academy: is ${player.name} losing his edge?"
+                                    ).random(rng)
+                                    else -> listOf(
+                                        "${player.name} holding down a starting spot in U18s.",
+                                        "Steady week for ${player.name} in the academy setup — no fireworks, no drama.",
+                                        "${player.name} putting in the reps at U18 level, building toward a breakthrough.",
+                                        "Academy report: ${player.name} remains a fixture in the U18s XI.",
+                                        "Nothing flashy, just consistent minutes for ${player.name} in the youth ranks."
+                                    ).random(rng)
+                                }
+                                SocialPostEntity(
+                                    sequenceIndex = currentSeq,
+                                    seasonNumber = gameState.currentSeason,
+                                    monthIndex = gameState.currentMonthIndex,
+                                    postType = "PUNDIT",
+                                    authorName = name,
+                                    authorHandle = handle,
+                                    authorInitials = init,
+                                    content = youthContent,
+                                    isAboutPlayerOrClub = true,
+                                    relatedClubId = club?.id,
+                                    likeCount = scaledLikeCount(rng, 200, 3500, 0.5f, player)
+                                )
+                            }
+                        }
+
+                        PHASE_SENIOR -> {
+                            when {
+                                age < 24 && ovr < 75 -> {
+                                    val (name, handle, init) = influencerAuthors[rng.nextInt(influencerAuthors.size)]
+                                    if (isInteractiveReply) {
+                                        SocialPostEntity(
+                                            sequenceIndex = currentSeq,
+                                            seasonNumber = gameState.currentSeason,
+                                            monthIndex = gameState.currentMonthIndex,
+                                            postType = "INFLUENCER",
+                                            authorName = name,
+                                            authorHandle = handle,
+                                            authorInitials = init,
+                                            content = "Pundit Take: Young ${player.name} ($age) has huge promise at $clubName, but should the manager start him regularly or manage his minutes?",
+                                            isAboutPlayerOrClub = true,
+                                            relatedClubId = club?.id,
+                                            likeCount = scaledLikeCount(rng, 1500, 14000, 1.1f, player),
+                                            isReplyable = true,
+                                            reply1Text = "Ambitious: 'I am ready whenever the gaffer calls my name.'",
+                                            reply1MoraleMod = 4,
+                                            reply1FanRepMod = 4,
+                                            reply1ManagerTrustMod = 3,
+                                            reply2Text = "Patient: 'Trusting the manager's development process completely.'",
+                                            reply2ManagerTrustMod = 6,
+                                            reply2MoraleMod = 2,
+                                            reply3Text = "Bold: 'Put me on the pitch and I will deliver.'",
+                                            reply3FanRepMod = 5,
+                                            reply3MoraleMod = 3,
+                                            reply3ManagerTrustMod = -1
+                                        )
+                                    } else {
+                                        val youngTemplates = listOf(
+                                            "Young ${player.name} making strides at $clubName.",
+                                            "${player.name} ($age) earning late substitute minutes.",
+                                            "Developing talent: ${player.name} showing encouraging glimpses of potential."
+                                        )
+                                        SocialPostEntity(
+                                            sequenceIndex = currentSeq,
+                                            seasonNumber = gameState.currentSeason,
+                                            monthIndex = gameState.currentMonthIndex,
+                                            postType = "INFLUENCER",
+                                            authorName = name,
+                                            authorHandle = handle,
+                                            authorInitials = init,
+                                            content = youngTemplates[rng.nextInt(youngTemplates.size)],
+                                            isAboutPlayerOrClub = true,
+                                            relatedClubId = club?.id,
+                                            likeCount = scaledLikeCount(rng, 1000, 12000, 1.0f, player)
                                         )
                                     }
                                 }
 
-                                age >= 36 -> {
-                                    val veteranTemplates = listOf(
-                                        "The end of an era: ${player.name} ($age) contemplating the final chapter of a legendary career.",
-                                        "Pundit retrospective: ${player.name}'s impact over the years has been immense.",
-                                        "Respect: ${player.name} receiving warm applause from opposing fans across the league."
-                                    )
-                                    val (name, handle, init) = punditAuthors[rng.nextInt(punditAuthors.size)]
+                                (form <= -2 || managerTrust < 35) -> {
+                                    val (name, handle, init) = citizenAuthors[rng.nextInt(citizenAuthors.size)]
+                                    val critContent = listOf(
+                                        "Frustrations mounting around ${player.name} after a dip in form for $clubName.",
+                                        "Tough questions for ${player.name} after missing key opportunities in front of goal.",
+                                        "Can ${player.name} bounce back and silence the doubters this week?"
+                                    )[rng.nextInt(3)]
                                     SocialPostEntity(
                                         sequenceIndex = currentSeq,
                                         seasonNumber = gameState.currentSeason,
                                         monthIndex = gameState.currentMonthIndex,
-                                        postType = "PUNDIT",
+                                        postType = "CITIZEN",
                                         authorName = name,
                                         authorHandle = handle,
                                         authorInitials = init,
-                                        content = veteranTemplates[rng.nextInt(veteranTemplates.size)],
+                                        content = critContent,
                                         isAboutPlayerOrClub = true,
                                         relatedClubId = club?.id,
-                                        likeCount = scaledLikeCount(rng, 5000, 45000, 1.4f, player)
+                                        likeCount = scaledLikeCount(rng, 1000, 18000, 1.1f, player),
+                                        isReplyable = true,
+                                        reply1Text = "Accountability: 'I hold myself to the highest standard. Working hard to make it right.'",
+                                        reply1ManagerTrustMod = 5,
+                                        reply1FanRepMod = 4,
+                                        reply1MoraleMod = 2,
+                                        reply2Text = "Defiant: 'Form is temporary, class is permanent. Keep watching.'",
+                                        reply2FanRepMod = 5,
+                                        reply2MoraleMod = 3,
+                                        reply2ManagerTrustMod = -2,
+                                        reply3Text = "Team Unity: 'We stay together through the storm. Big response coming.'",
+                                        reply3ManagerTrustMod = 4,
+                                        reply3MoraleMod = 3,
+                                        reply3FanRepMod = 3
                                     )
                                 }
 
-                                else -> {
-                                    // Prime Senior player (age 24-29, OVR >= 75)
+                                age >= 35 -> {
                                     val (name, handle, init) = punditAuthors[rng.nextInt(punditAuthors.size)]
-                                    val isUnpopularOpinion = rng.nextFloat() < 0.12f
-                                    val primeContent = if (isUnpopularOpinion) {
-                                        "Unpopular opinion: ${player.name} is currently a top 3 striker in the league."
+                                    if (isInteractiveReply) {
+                                        SocialPostEntity(
+                                            sequenceIndex = currentSeq,
+                                            seasonNumber = gameState.currentSeason,
+                                            monthIndex = gameState.currentMonthIndex,
+                                            postType = "PUNDIT",
+                                            authorName = name,
+                                            authorHandle = handle,
+                                            authorInitials = init,
+                                            content = "Legend Status: ${player.name} ($age) continues to lead $clubName. How will history remember this career?",
+                                            isAboutPlayerOrClub = true,
+                                            relatedClubId = club?.id,
+                                            likeCount = scaledLikeCount(rng, 10000, 65000, 1.6f, player),
+                                            isReplyable = true,
+                                            reply1Text = "Heartfelt: 'Privileged to wear this shirt and give everything for the fans.'",
+                                            reply1FanRepMod = 6,
+                                            reply1MoraleMod = 4,
+                                            reply2Text = "Relentless: 'Not done yet. We still have trophies to fight for.'",
+                                            reply2MoraleMod = 5,
+                                            reply2ManagerTrustMod = 4,
+                                            reply2FanRepMod = 4,
+                                            reply3Text = "Legacy: 'Passing wisdom to the next generation of players.'",
+                                            reply3ManagerTrustMod = 5,
+                                            reply3FanRepMod = 4,
+                                            reply3MoraleMod = 3
+                                        )
                                     } else {
-                                        listOf(
-                                            "${player.name} in the conversation for national team call-up!",
-                                            "${player.name} climbing the top scorer charts at $clubName.",
-                                            "Player of the Month candidate: ${player.name} on a remarkable streak."
-                                        )[rng.nextInt(3)]
+                                        val veteranTemplates = listOf(
+                                            "The end of an era: ${player.name} ($age) contemplating the final chapter of a legendary career.",
+                                            "Pundit retrospective: ${player.name}'s impact over the years has been immense.",
+                                            "Respect: ${player.name} receiving warm applause from opposing fans across the league."
+                                        )
+                                        SocialPostEntity(
+                                            sequenceIndex = currentSeq,
+                                            seasonNumber = gameState.currentSeason,
+                                            monthIndex = gameState.currentMonthIndex,
+                                            postType = "PUNDIT",
+                                            authorName = name,
+                                            authorHandle = handle,
+                                            authorInitials = init,
+                                            content = veteranTemplates[rng.nextInt(veteranTemplates.size)],
+                                            isAboutPlayerOrClub = true,
+                                            relatedClubId = club?.id,
+                                            likeCount = scaledLikeCount(rng, 5000, 45000, 1.4f, player)
+                                        )
                                     }
-                                    SocialPostEntity(
-                                        sequenceIndex = currentSeq,
-                                        seasonNumber = gameState.currentSeason,
-                                        monthIndex = gameState.currentMonthIndex,
-                                        postType = "PUNDIT",
-                                        authorName = name,
-                                        authorHandle = handle,
-                                        authorInitials = init,
-                                        content = primeContent,
-                                        isAboutPlayerOrClub = true,
-                                        relatedClubId = club?.id,
-                                        likeCount = scaledLikeCount(rng, 4000, 50000, 1.5f, player)
-                                    )
+                                }
+
+                                else -> {
+                                    // Prime Senior player (age 24-34, OVR >= 75)
+                                    val (name, handle, init) = punditAuthors[rng.nextInt(punditAuthors.size)]
+                                    if (isInteractiveReply) {
+                                        val primeVar = rng.nextInt(3)
+                                        when (primeVar) {
+                                            0 -> {
+                                                SocialPostEntity(
+                                                    sequenceIndex = currentSeq,
+                                                    seasonNumber = gameState.currentSeason,
+                                                    monthIndex = gameState.currentMonthIndex,
+                                                    postType = "PUNDIT",
+                                                    authorName = name,
+                                                    authorHandle = handle,
+                                                    authorInitials = init,
+                                                    content = "Debate Night: Is ${player.name} the most clinical striker in European football right now?",
+                                                    isAboutPlayerOrClub = true,
+                                                    relatedClubId = club?.id,
+                                                    likeCount = scaledLikeCount(rng, 8000, 75000, 1.8f, player),
+                                                    isReplyable = true,
+                                                    reply1Text = "Humble Star: 'Team creates the chances, I just finish them.'",
+                                                    reply1ManagerTrustMod = 5,
+                                                    reply1FanRepMod = 4,
+                                                    reply1MoraleMod = 3,
+                                                    reply2Text = "Confident: 'I back myself against any defense in the world.'",
+                                                    reply2MoraleMod = 5,
+                                                    reply2FanRepMod = 5,
+                                                    reply2RivalRelMod = -3,
+                                                    reply3Text = "Silverware Focused: 'Stats are nice, but only trophies matter.'",
+                                                    reply3ManagerTrustMod = 6,
+                                                    reply3FanRepMod = 5,
+                                                    reply3MoraleMod = 4
+                                                )
+                                            }
+                                            1 -> {
+                                                SocialPostEntity(
+                                                    sequenceIndex = currentSeq,
+                                                    seasonNumber = gameState.currentSeason,
+                                                    monthIndex = gameState.currentMonthIndex,
+                                                    postType = "CLUB_NEWS",
+                                                    authorName = "Club Insider",
+                                                    authorHandle = "@ClubInsiderNews",
+                                                    authorInitials = "CI",
+                                                    content = "Transfer buzz: European giants reportedly scouting ${player.name} ahead of the upcoming transfer window.",
+                                                    isAboutPlayerOrClub = true,
+                                                    relatedClubId = club?.id,
+                                                    likeCount = scaledLikeCount(rng, 12000, 85000, 1.9f, player),
+                                                    isReplyable = true,
+                                                    reply1Text = "Loyal: 'My heart is at $clubName. Fully dedicated to our badge.'",
+                                                    reply1ManagerTrustMod = 7,
+                                                    reply1FanRepMod = 6,
+                                                    reply1MoraleMod = 3,
+                                                    reply2Text = "Diplomatic: 'Focused purely on the next match. Let the agent handle rumors.'",
+                                                    reply2ManagerTrustMod = 3,
+                                                    reply2MoraleMod = 2,
+                                                    reply3Text = "Ambitious: 'Always want to compete at the absolute highest level.'",
+                                                    reply3MoraleMod = 4,
+                                                    reply3FanRepMod = 2,
+                                                    reply3ManagerTrustMod = -3
+                                                )
+                                            }
+                                            else -> {
+                                                SocialPostEntity(
+                                                    sequenceIndex = currentSeq,
+                                                    seasonNumber = gameState.currentSeason,
+                                                    monthIndex = gameState.currentMonthIndex,
+                                                    postType = "CITIZEN",
+                                                    authorName = "RivalBanter_FC",
+                                                    authorHandle = "@RivalBanterFC",
+                                                    authorInitials = "RB",
+                                                    content = "Big rivalry clash coming up. ${player.name} won't have it easy against our center-backs!",
+                                                    isAboutPlayerOrClub = true,
+                                                    relatedClubId = club?.id,
+                                                    likeCount = scaledLikeCount(rng, 4000, 35000, 1.3f, player),
+                                                    isReplyable = true,
+                                                    reply1Text = "Sharp Banter: 'Tell them to wear running shoes 😉'",
+                                                    reply1FanRepMod = 6,
+                                                    reply1MoraleMod = 4,
+                                                    reply1RivalRelMod = -5,
+                                                    reply2Text = "Respectful: 'Rivalry matches are always intense. Looking forward to it.'",
+                                                    reply2ManagerTrustMod = 4,
+                                                    reply2RivalRelMod = 4,
+                                                    reply2FanRepMod = 2,
+                                                    reply3Text = "Laser Focused: 'Talking happens before the match. Winning happens during it.'",
+                                                    reply3ManagerTrustMod = 5,
+                                                    reply3MoraleMod = 4,
+                                                    reply3FanRepMod = 4
+                                                )
+                                            }
+                                        }
+                                    } else {
+                                        val isUnpopularOpinion = rng.nextFloat() < 0.12f
+                                        val primeContent = if (isUnpopularOpinion) {
+                                            "Unpopular opinion: ${player.name} is currently a top 3 striker in the league."
+                                        } else {
+                                            listOf(
+                                                "${player.name} in the conversation for national team call-up!",
+                                                "${player.name} climbing the top scorer charts at $clubName.",
+                                                "Player of the Month candidate: ${player.name} on a remarkable streak."
+                                            )[rng.nextInt(3)]
+                                        }
+                                        SocialPostEntity(
+                                            sequenceIndex = currentSeq,
+                                            seasonNumber = gameState.currentSeason,
+                                            monthIndex = gameState.currentMonthIndex,
+                                            postType = "PUNDIT",
+                                            authorName = name,
+                                            authorHandle = handle,
+                                            authorInitials = init,
+                                            content = primeContent,
+                                            isAboutPlayerOrClub = true,
+                                            relatedClubId = club?.id,
+                                            likeCount = scaledLikeCount(rng, 4000, 50000, 1.5f, player)
+                                        )
+                                    }
                                 }
                             }
                         }
