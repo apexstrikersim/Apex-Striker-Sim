@@ -54,7 +54,7 @@ fun ChoiceEventDialog(viewModel: CareerViewModel, gameState: GameStateEntity) {
                     )
                 }
 
-                Divider(color = BorderColor)
+                HorizontalDivider(color = BorderColor)
 
                 Text(
                     text = prompt,

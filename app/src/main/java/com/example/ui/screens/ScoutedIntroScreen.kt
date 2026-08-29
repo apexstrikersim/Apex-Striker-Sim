@@ -68,7 +68,7 @@ fun ScoutedIntroScreen(viewModel: CareerViewModel, gameState: GameStateEntity?) 
                     letterSpacing = 2.sp
                 )
 
-                Divider(color = BorderColor)
+                HorizontalDivider(color = BorderColor)
 
                 Text(
                     text = gameState?.narrativeLog?.split("---")?.firstOrNull() ?: "You've been scouted!",
@@ -78,7 +78,7 @@ fun ScoutedIntroScreen(viewModel: CareerViewModel, gameState: GameStateEntity?) 
                     textAlign = TextAlign.Center
                 )
 
-                Divider(color = BorderColor)
+                HorizontalDivider(color = BorderColor)
 
                 Button(
                     onClick = { viewModel.skipIntro() },

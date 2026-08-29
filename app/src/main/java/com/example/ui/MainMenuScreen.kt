@@ -5,7 +5,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.ClickableText
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -14,8 +13,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.TextLinkStyles
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -23,6 +24,7 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.data.AppVersion
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.R
 import com.example.ui.theme.*
@@ -96,7 +98,7 @@ fun MainMenuScreen(viewModel: CareerViewModel) {
                     border = androidx.compose.foundation.BorderStroke(1.dp, BorderColor)
                 ) {
                     Text(
-                        text = "v2.4.1",
+                        text = "v${AppVersion.CURRENT}",
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
                         color = TrophyGold,
@@ -158,33 +160,38 @@ fun MainMenuScreen(viewModel: CareerViewModel) {
             }
 
             // Legal footer
+            val linkStyles = TextLinkStyles(
+                style = SpanStyle(
+                    color = PitchGreen,
+                    textDecoration = TextDecoration.Underline
+                )
+            )
             val legalText = buildAnnotatedString {
                 append("By playing, you agree to our ")
-                pushStringAnnotation(tag = "TOS", annotation = "terms")
-                withStyle(SpanStyle(color = PitchGreen, textDecoration = TextDecoration.Underline)) {
-                    append("Terms of Service")
-                }
+                pushLink(
+                    LinkAnnotation.Clickable(
+                        tag = "TOS",
+                        styles = linkStyles,
+                        linkInteractionListener = { activeLegalDialog = "TOS" }
+                    )
+                )
+                append("Terms of Service")
                 pop()
                 append(" and ")
-                pushStringAnnotation(tag = "PRIVACY", annotation = "privacy")
-                withStyle(SpanStyle(color = PitchGreen, textDecoration = TextDecoration.Underline)) {
-                    append("Privacy Policy")
-                }
+                pushLink(
+                    LinkAnnotation.Clickable(
+                        tag = "PRIVACY",
+                        styles = linkStyles,
+                        linkInteractionListener = { activeLegalDialog = "PRIVACY" }
+                    )
+                )
+                append("Privacy Policy")
                 pop()
             }
 
-            ClickableText(
+            Text(
                 text = legalText,
                 style = TextStyle(color = TextSecondary, fontSize = 11.sp, textAlign = TextAlign.Center),
-                onClick = { offset ->
-                    legalText.getStringAnnotations(offset, offset).firstOrNull()?.let { annotation ->
-                        if (annotation.tag == "TOS") {
-                            activeLegalDialog = "TOS"
-                        } else if (annotation.tag == "PRIVACY") {
-                            activeLegalDialog = "PRIVACY"
-                        }
-                    }
-                },
                 modifier = Modifier.padding(horizontal = 16.dp)
             )
         }

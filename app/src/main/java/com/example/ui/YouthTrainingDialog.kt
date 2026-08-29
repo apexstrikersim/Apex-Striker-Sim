@@ -77,7 +77,6 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.example.data.PlayerEntity
-import kotlinx.coroutines.delay
 import kotlin.math.hypot
 import kotlin.math.max
 import kotlin.math.min

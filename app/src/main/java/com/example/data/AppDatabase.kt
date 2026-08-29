@@ -154,6 +154,9 @@ interface CareerDao {
     @Query("SELECT * FROM club_season_history WHERE clubId = :clubId ORDER BY seasonNumber DESC")
     fun getHistoryForClubFlow(clubId: Int): Flow<List<ClubSeasonHistoryEntity>>
 
+    @Query("SELECT * FROM club_season_history WHERE seasonNumber >= :minSeason AND leagueFinishPosition = 1")
+    suspend fun getRecentLeagueWinnersSync(minSeason: Int): List<ClubSeasonHistoryEntity>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertClubSeasonHistories(histories: List<ClubSeasonHistoryEntity>)
 
@@ -364,7 +367,7 @@ interface CareerDao {
         NpcStrikerEntity::class,
         NpcManagerEntity::class
     ],
-    version = 25,
+    version = AppVersion.CURRENT,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -785,6 +788,26 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_25_26 = object : Migration(25, 26) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // No schema change this version — bump kept in lockstep with AppVersion.CURRENT per policy.
+            }
+        }
+
+        val MIGRATION_26_27 = object : Migration(26, 27) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                try {
+                    db.execSQL("ALTER TABLE players ADD COLUMN faceDescriptor TEXT NOT NULL DEFAULT ''")
+                } catch (e: Exception) {}
+                try {
+                    db.execSQL("ALTER TABLE legacies ADD COLUMN faceDescriptor TEXT NOT NULL DEFAULT ''")
+                } catch (e: Exception) {}
+                try {
+                    db.execSQL("ALTER TABLE legacies ADD COLUMN finalAge INTEGER NOT NULL DEFAULT 0")
+                } catch (e: Exception) {}
+            }
+        }
+
         private val instances = mutableMapOf<Int, AppDatabase>()
 
         fun getDatabase(context: Context, slotId: Int = 1): AppDatabase {
@@ -796,7 +819,7 @@ abstract class AppDatabase : RoomDatabase() {
                         AppDatabase::class.java,
                         "apex_career_slot_$slotId.db"
                     )
-                    .addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17, MIGRATION_17_18, MIGRATION_18_19, MIGRATION_19_20, MIGRATION_20_21, MIGRATION_21_22, MIGRATION_22_23, MIGRATION_23_24, MIGRATION_24_25)
+                    .addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17, MIGRATION_17_18, MIGRATION_18_19, MIGRATION_19_20, MIGRATION_20_21, MIGRATION_21_22, MIGRATION_22_23, MIGRATION_23_24, MIGRATION_24_25, MIGRATION_25_26, MIGRATION_26_27)
                     .fallbackToDestructiveMigration()
                     .build()
                 }

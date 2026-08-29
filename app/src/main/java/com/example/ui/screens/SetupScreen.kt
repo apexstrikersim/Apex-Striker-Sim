@@ -17,6 +17,7 @@ import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.LocationCity
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.School
+import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.filled.SportsSoccer
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -35,9 +36,11 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.data.FaceDescriptor
 import com.example.ui.CareerViewModel
 import com.example.ui.components.CountryFlagIcon
 import com.example.ui.components.JerseyNumberIcon
+import com.example.ui.components.PlayerFaceIcon
 import com.example.ui.components.RepeatingStepperButton
 import com.example.ui.theme.*
 
@@ -66,6 +69,10 @@ fun SetupScreen(viewModel: CareerViewModel) {
             "Italy" -> "ITA"
             else -> country.take(3).uppercase()
         }
+    }
+
+    var faceDescriptor by remember(selectedBirthCountry) {
+        mutableStateOf(FaceDescriptor.random(getCountryCode(selectedBirthCountry)))
     }
 
     Column(
@@ -167,68 +174,109 @@ fun SetupScreen(viewModel: CareerViewModel) {
                     color = PitchGreen
                 )
 
-                // Name input
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(52.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(DarkSlate)
-                        .border(
-                            width = 1.dp,
-                            color = if (isInputFocused || name.isNotEmpty()) PitchGreen else BorderColor,
-                            shape = RoundedCornerShape(12.dp)
-                        )
-                        .padding(horizontal = 14.dp),
-                    contentAlignment = Alignment.CenterStart
+                // Face Preview & Name input row
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.fillMaxWidth()
+                    Box(
+                        modifier = Modifier
+                            .size(52.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(DarkSlate)
+                            .border(1.dp, BorderColor, RoundedCornerShape(12.dp)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        PlayerFaceIcon(
+                            descriptor = faceDescriptor,
+                            age = 16,
+                            modifier = Modifier.size(46.dp)
+                        )
+                    }
+
+                    IconButton(
+                        onClick = {
+                            faceDescriptor = FaceDescriptor.random(getCountryCode(selectedBirthCountry))
+                        },
+                        modifier = Modifier
+                            .size(44.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(DarkSlate)
+                            .border(1.dp, BorderColor, RoundedCornerShape(12.dp))
+                            .testTag("reroll_face_button")
                     ) {
                         Icon(
-                            imageVector = Icons.Default.Person,
-                            contentDescription = "Person Icon",
-                            tint = if (isInputFocused || name.isNotEmpty()) PitchGreen else TextSecondary,
+                            imageVector = Icons.Default.Shuffle,
+                            contentDescription = "Reroll Face",
+                            tint = PitchGreen,
                             modifier = Modifier.size(20.dp)
                         )
-                        Spacer(modifier = Modifier.width(10.dp))
-                        BasicTextField(
-                            value = name,
-                            onValueChange = { input ->
-                                val filtered = input.filter { it.isLetter() || it == ' ' || it == '-' || it == '\'' }
-                                if (filtered.length <= 24) name = filtered
-                            },
-                            singleLine = true,
-                            keyboardOptions = KeyboardOptions(
-                                keyboardType = KeyboardType.Text,
-                                capitalization = KeyboardCapitalization.Words
-                            ),
-                            textStyle = TextStyle(
-                                color = TextPrimary,
-                                fontSize = 15.sp,
-                                fontWeight = FontWeight.Medium
-                            ),
-                            modifier = Modifier
-                                .weight(1f)
-                                .onFocusChanged { isInputFocused = it.isFocused }
-                                .testTag("name_input"),
-                            decorationBox = { innerTextField ->
-                                Box(contentAlignment = Alignment.CenterStart) {
-                                    if (name.isEmpty()) {
-                                        Text(
-                                            text = "Character Name",
-                                            color = TextSecondary,
-                                            style = TextStyle(
-                                                fontSize = 15.sp,
-                                                fontWeight = FontWeight.Medium
+                    }
+
+                    // Name input
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(52.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(DarkSlate)
+                            .border(
+                                width = 1.dp,
+                                color = if (isInputFocused || name.isNotEmpty()) PitchGreen else BorderColor,
+                                shape = RoundedCornerShape(12.dp)
+                            )
+                            .padding(horizontal = 12.dp),
+                        contentAlignment = Alignment.CenterStart
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Person,
+                                contentDescription = "Person Icon",
+                                tint = if (isInputFocused || name.isNotEmpty()) PitchGreen else TextSecondary,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            BasicTextField(
+                                value = name,
+                                onValueChange = { input ->
+                                    val filtered = input.filter { it.isLetter() || it == ' ' || it == '-' || it == '\'' }
+                                    if (filtered.length <= 24) name = filtered
+                                },
+                                singleLine = true,
+                                keyboardOptions = KeyboardOptions(
+                                    keyboardType = KeyboardType.Text,
+                                    capitalization = KeyboardCapitalization.Words
+                                ),
+                                textStyle = TextStyle(
+                                    color = TextPrimary,
+                                    fontSize = 15.sp,
+                                    fontWeight = FontWeight.Medium
+                                ),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .onFocusChanged { isInputFocused = it.isFocused }
+                                    .testTag("name_input"),
+                                decorationBox = { innerTextField ->
+                                    Box(contentAlignment = Alignment.CenterStart) {
+                                        if (name.isEmpty()) {
+                                            Text(
+                                                text = "Character Name",
+                                                color = TextSecondary,
+                                                style = TextStyle(
+                                                    fontSize = 15.sp,
+                                                    fontWeight = FontWeight.Medium
+                                                )
                                             )
-                                        )
+                                        }
+                                        innerTextField()
                                     }
-                                    innerTextField()
                                 }
-                            }
-                        )
+                            )
+                        }
                     }
                 }
 
@@ -499,7 +547,8 @@ fun SetupScreen(viewModel: CareerViewModel) {
                         academy = selectedBirthCountry,
                         preferredFoot = preferredFoot,
                         squadNumber = squadNumber,
-                        backgroundStory = backgroundStory
+                        backgroundStory = backgroundStory,
+                        faceDescriptor = faceDescriptor.serialize()
                     )
                 }
             },

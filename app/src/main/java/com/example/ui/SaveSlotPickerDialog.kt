@@ -82,7 +82,7 @@ fun SaveSlotPickerDialog(
                     }
                 }
 
-                Divider(color = BorderColor)
+                HorizontalDivider(color = BorderColor)
 
                 LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     items(5) { index ->

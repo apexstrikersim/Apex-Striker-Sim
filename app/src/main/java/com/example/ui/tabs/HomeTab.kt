@@ -26,10 +26,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.data.ClubEntity
+import com.example.data.FaceDescriptor
 import com.example.data.GameStateEntity
 import com.example.data.PlayerEntity
 import com.example.data.formatSeasonYear
 import com.example.ui.CareerViewModel
+import com.example.ui.components.PlayerFaceIcon
 import com.example.ui.components.SocialStatBar
 import com.example.ui.components.StatItem
 import com.example.ui.components.StatSnapshotItem
@@ -77,26 +79,51 @@ fun HomeTab(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Column {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(54.dp)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(DarkSlate)
+                                    .border(1.dp, BorderColor, RoundedCornerShape(12.dp)),
+                                contentAlignment = Alignment.Center
                             ) {
-                                Text(
-                                    text = "STRIKER PROFILE",
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = PitchGreen,
-                                    letterSpacing = 1.sp
-                                )
-                                Text(
-                                    text = "• ${formatSeasonYear(gameState.currentSeason)}",
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = TrophyGold
+                                PlayerFaceIcon(
+                                    descriptor = FaceDescriptor.deserialize(player.faceDescriptor),
+                                    age = player.age,
+                                    form = player.form,
+                                    modifier = Modifier.size(48.dp)
                                 )
                             }
-                            Text(text = "Age: ${player.age} (Gen ${player.generation})", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+
+                            Column {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Text(
+                                        text = "STRIKER PROFILE",
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = PitchGreen,
+                                        letterSpacing = 1.sp
+                                    )
+                                    Text(
+                                        text = "• ${formatSeasonYear(gameState.currentSeason)}",
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = TrophyGold
+                                    )
+                                }
+                                Text(
+                                    text = "Age: ${player.age} (Gen ${player.generation})",
+                                    fontSize = 17.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
                         }
 
                         Button(
@@ -126,7 +153,7 @@ fun HomeTab(
                     }
 
                     Spacer(modifier = Modifier.height(16.dp))
-                    Divider(color = BorderColor)
+                    HorizontalDivider(color = BorderColor)
                     Spacer(modifier = Modifier.height(12.dp))
 
                     // Season stat snapshot
@@ -141,7 +168,7 @@ fun HomeTab(
                     }
 
                     Spacer(modifier = Modifier.height(12.dp))
-                    Divider(color = BorderColor)
+                    HorizontalDivider(color = BorderColor)
                     Spacer(modifier = Modifier.height(12.dp))
 
                     // Fatigue and Overtraining Risk Row
@@ -201,7 +228,7 @@ fun HomeTab(
                     }
 
                     Spacer(modifier = Modifier.height(12.dp))
-                    Divider(color = BorderColor)
+                    HorizontalDivider(color = BorderColor)
                     Spacer(modifier = Modifier.height(8.dp))
 
                     var isSocialStatsExpanded by remember { mutableStateOf(false) }
@@ -510,7 +537,7 @@ fun HomeTab(
                                             lineHeight = 18.sp
                                         )
                                         Spacer(modifier = Modifier.height(8.dp))
-                                        Divider(color = BorderColor.copy(alpha = 0.4f))
+                                        HorizontalDivider(color = BorderColor.copy(alpha = 0.4f))
                                     }
                                 }
                             }

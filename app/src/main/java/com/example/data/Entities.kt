@@ -179,7 +179,8 @@ data class PlayerEntity(
     var backgroundStory: String = "Street Cages",
     var pendingNewManagerNotice: Boolean = false,
     var isGodMode: Boolean = false,
-    var lastGoalMilestonePosted: Int = 0
+    var lastGoalMilestonePosted: Int = 0,
+    var faceDescriptor: String = ""
 )
 
 @Entity(tableName = "standings", indices = [Index(value = ["country"])])
@@ -247,7 +248,9 @@ data class LegacyEntity(
     val finalOvr: Int,
     val clubsPlayed: String, // comma-separated names
     val isCompleted: Boolean = false,
-    val retirementDescription: String = ""
+    val retirementDescription: String = "",
+    val faceDescriptor: String = "",
+    val finalAge: Int = 0
 )
 
 @Entity(tableName = "game_state")

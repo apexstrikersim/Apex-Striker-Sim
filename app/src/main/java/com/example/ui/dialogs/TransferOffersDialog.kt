@@ -68,7 +68,7 @@ fun TransferOffersDialog(viewModel: CareerViewModel) {
                     }
                 }
 
-                Divider(color = BorderColor)
+                HorizontalDivider(color = BorderColor)
 
                 if (offers.isEmpty()) {
                     Box(modifier = Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) {
@@ -203,7 +203,7 @@ fun ContractSigningDialog(
                     Text("${offer.clubReputation} CLUB", fontSize = 11.sp, letterSpacing = 1.5.sp, color = inkColor.copy(alpha = 0.55f))
 
                     Spacer(Modifier.height(14.dp))
-                    Divider(color = goldRule.copy(alpha = 0.6f), thickness = 1.dp)
+                    HorizontalDivider(color = goldRule.copy(alpha = 0.6f), thickness = 1.dp)
                     Spacer(Modifier.height(14.dp))
 
                     Text(
@@ -242,7 +242,7 @@ fun ContractSigningDialog(
                                 color = inkColor.copy(alpha = 0.85f)
                             )
                             Spacer(Modifier.height(4.dp))
-                            Divider(color = inkColor.copy(alpha = 0.3f), thickness = 1.dp)
+                            HorizontalDivider(color = inkColor.copy(alpha = 0.3f), thickness = 1.dp)
                             Text("CLUB REPRESENTATIVE", fontSize = 9.sp, letterSpacing = 0.8.sp, color = inkColor.copy(alpha = 0.5f))
                         }
 
@@ -275,7 +275,7 @@ fun ContractSigningDialog(
                                     )
                                 }
                             }
-                            Divider(color = inkColor.copy(alpha = 0.3f), thickness = 1.dp)
+                            HorizontalDivider(color = inkColor.copy(alpha = 0.3f), thickness = 1.dp)
                             Text("PLAYER SIGNATURE", fontSize = 9.sp, letterSpacing = 0.8.sp, color = inkColor.copy(alpha = 0.5f))
                         }
                     }

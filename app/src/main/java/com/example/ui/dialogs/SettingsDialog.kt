@@ -26,6 +26,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.data.AppVersion
 import com.example.data.GameStateEntity
 import com.example.ui.CareerViewModel
 import com.example.ui.components.bounceClick
@@ -99,7 +100,7 @@ fun SettingsDialog(viewModel: CareerViewModel, gameState: GameStateEntity?) {
                             Icon(imageVector = Icons.Default.Close, contentDescription = "Close", tint = TextSecondary)
                         }
                     }
-                    Divider(color = BorderColor)
+                    HorizontalDivider(color = BorderColor)
                     Spacer(modifier = Modifier.height(8.dp))
                 }
 
@@ -135,7 +136,7 @@ fun SettingsDialog(viewModel: CareerViewModel, gameState: GameStateEntity?) {
                         }
 
                         if (expandedSection == "general") {
-                            Divider(color = BorderColor.copy(alpha = 0.5f))
+                            HorizontalDivider(color = BorderColor.copy(alpha = 0.5f))
                             Spacer(modifier = Modifier.height(12.dp))
                             Row(
                                 modifier = Modifier
@@ -154,7 +155,7 @@ fun SettingsDialog(viewModel: CareerViewModel, gameState: GameStateEntity?) {
                                     colors = SwitchDefaults.colors(checkedThumbColor = PitchGreen)
                                 )
                             }
-                            Divider(color = BorderColor.copy(alpha = 0.3f))
+                            HorizontalDivider(color = BorderColor.copy(alpha = 0.3f))
                             Spacer(modifier = Modifier.height(10.dp))
                             OutlinedButton(
                                 onClick = {
@@ -219,7 +220,7 @@ fun SettingsDialog(viewModel: CareerViewModel, gameState: GameStateEntity?) {
                         }
 
                         if (expandedSection == "audio") {
-                            Divider(color = BorderColor.copy(alpha = 0.5f))
+                            HorizontalDivider(color = BorderColor.copy(alpha = 0.5f))
                             Spacer(modifier = Modifier.height(12.dp))
                             
                             // Mute Audio
@@ -316,7 +317,7 @@ fun SettingsDialog(viewModel: CareerViewModel, gameState: GameStateEntity?) {
                         }
 
                         if (expandedSection == "save") {
-                            Divider(color = BorderColor.copy(alpha = 0.5f))
+                            HorizontalDivider(color = BorderColor.copy(alpha = 0.5f))
                             Spacer(modifier = Modifier.height(12.dp))
 
                             // Manual Save
@@ -415,7 +416,7 @@ fun SettingsDialog(viewModel: CareerViewModel, gameState: GameStateEntity?) {
                             }
 
                             if (expandedSection == "dev") {
-                                Divider(color = BorderColor.copy(alpha = 0.5f))
+                                HorizontalDivider(color = BorderColor.copy(alpha = 0.5f))
                                 Spacer(modifier = Modifier.height(12.dp))
 
                                 Column(
@@ -548,7 +549,7 @@ fun SettingsDialog(viewModel: CareerViewModel, gameState: GameStateEntity?) {
                                         }
 
                                         if (expandedDevPlayerStats) {
-                                            Divider(color = BorderColor.copy(alpha = 0.3f))
+                                            HorizontalDivider(color = BorderColor.copy(alpha = 0.3f))
                                             Spacer(modifier = Modifier.height(10.dp))
 
                                             Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(bottom = 10.dp)) {
@@ -646,7 +647,7 @@ fun SettingsDialog(viewModel: CareerViewModel, gameState: GameStateEntity?) {
                                         }
 
                                         if (expandedDevSocialStats) {
-                                            Divider(color = BorderColor.copy(alpha = 0.3f))
+                                            HorizontalDivider(color = BorderColor.copy(alpha = 0.3f))
                                             Spacer(modifier = Modifier.height(10.dp))
 
                                             Column(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.padding(bottom = 10.dp)) {
@@ -746,7 +747,7 @@ fun SettingsDialog(viewModel: CareerViewModel, gameState: GameStateEntity?) {
                 item {
                     Spacer(modifier = Modifier.height(10.dp))
                     Text(
-                        text = "Version 2.4.1 (Striker Edition)",
+                        text = "Version ${AppVersion.CURRENT} (Striker Edition)",
                         fontSize = 11.sp,
                         color = TextSecondary,
                         textAlign = TextAlign.Center,

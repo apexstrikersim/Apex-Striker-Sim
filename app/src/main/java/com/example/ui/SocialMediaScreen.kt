@@ -343,7 +343,7 @@ fun SocialPostCard(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Box(
                             modifier = Modifier
-                                .size(20.dp)
+                                .size(22.dp)
                                 .clip(CircleShape)
                                 .background(DarkSlate)
                                 .border(1.dp, PitchGreen, CircleShape),
@@ -351,9 +351,11 @@ fun SocialPostCard(
                         ) {
                             Text(
                                 text = playerInitials,
-                                fontSize = 8.sp,
+                                fontSize = 7.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = PitchGreen
+                                color = PitchGreen,
+                                maxLines = 1,
+                                softWrap = false
                             )
                         }
                         Spacer(modifier = Modifier.width(6.dp))

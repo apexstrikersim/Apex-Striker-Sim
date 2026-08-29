@@ -184,7 +184,9 @@ class CareerRepository(private val context: Context, val slotId: Int = 1) {
         fatherPotentialCeiling: Int = 99,
         preferredFoot: String = "Right",
         squadNumber: Int = 9,
-        backgroundStory: String = "Street Cages"
+        backgroundStory: String = "Street Cages",
+        faceDescriptor: String = "",
+        fatherFaceDescriptor: String? = null
     ) {
         db.withTransaction {
             // Read legacy list to preserve it if starting a son's career
@@ -347,6 +349,13 @@ class CareerRepository(private val context: Context, val slotId: Int = 1) {
 
             val ovr = calculateOvr(finishing, pace, passing, physical, technique).coerceAtMost(potentialCeiling)
 
+            val resolvedFaceDescriptor = if (isSon && !fatherFaceDescriptor.isNullOrBlank()) {
+                val fatherDesc = FaceDescriptor.deserialize(fatherFaceDescriptor)
+                FaceDescriptor.inheritedFrom(fatherDesc, academyCountry).serialize()
+            } else {
+                faceDescriptor.ifBlank { FaceDescriptor.random(academyCountry).serialize() }
+            }
+
             val player = PlayerEntity(
                 name = playerName,
                 age = 13,
@@ -369,7 +378,8 @@ class CareerRepository(private val context: Context, val slotId: Int = 1) {
                 careerPhase = PHASE_STREET,
                 preferredFoot = preferredFoot,
                 squadNumber = squadNumber,
-                backgroundStory = backgroundStory
+                backgroundStory = backgroundStory,
+                faceDescriptor = resolvedFaceDescriptor
             )
             dao.insertPlayer(player)
 
@@ -1719,6 +1729,14 @@ class CareerRepository(private val context: Context, val slotId: Int = 1) {
         val myClub = allClubsMap[player.currentClubId]
         val trophyWinningClubIds = mutableSetOf<Int>()
 
+        // Compute recent league title counts (last 5 years + this season) for downfall risk
+        val minSeason = (gameState.currentSeason - 5).coerceAtLeast(1)
+        val recentWinnersHistory = dao.getRecentLeagueWinnersSync(minSeason)
+        val recentTitleCounts = mutableMapOf<Int, Int>()
+        for (h in recentWinnersHistory) {
+            recentTitleCounts[h.clubId] = (recentTitleCounts[h.clubId] ?: 0) + 1
+        }
+
         // Find League Winner for each country
         for (country in FictionalData.COUNTRIES) {
             val sortedStandings = dao.getStandingsByCountrySync(country)
@@ -1727,6 +1745,7 @@ class CareerRepository(private val context: Context, val slotId: Int = 1) {
                 if (winnerClub != null) {
                     seasonLogs.add("🥇 ${country} Champion: ${winnerClub.name} (${sortedStandings[0].points} pts)")
                     trophyWinningClubIds.add(winnerClub.id)
+                    recentTitleCounts[winnerClub.id] = (recentTitleCounts[winnerClub.id] ?: 0) + 1
                     
                     // If player is at this club, give league trophy
                     if (player.currentClubId == winnerClub.id) {
@@ -1743,7 +1762,7 @@ class CareerRepository(private val context: Context, val slotId: Int = 1) {
                 }
 
                 // Adjust club reputations based on league position
-                adjustClubsReputations(sortedStandings, allClubsMap)
+                adjustClubsReputations(sortedStandings, allClubsMap, recentTitleCounts)
             }
         }
 
@@ -2197,7 +2216,11 @@ class CareerRepository(private val context: Context, val slotId: Int = 1) {
  *
  * Called once per country, once per season, from handleEndOfSeason.
  */
-private suspend fun adjustClubsReputations(standings: List<StandingEntity>, clubsMap: Map<Int, ClubEntity>) {
+private suspend fun adjustClubsReputations(
+    standings: List<StandingEntity>,
+    clubsMap: Map<Int, ClubEntity>,
+    recentTitleCounts: Map<Int, Int> = emptyMap()
+) {
     if (standings.isEmpty()) return
 
     val leagueSize = standings.size
@@ -2241,15 +2264,30 @@ private suspend fun adjustClubsReputations(standings: List<StandingEntity>, club
         var momentum = club.momentumBias
         var seasonsRemaining = club.trajectorySeasonsRemaining
         if (seasonsRemaining <= 0) {
+            val titleCount = recentTitleCounts[club.id] ?: 0
+            val isDominant = titleCount >= 3
             val roll = Random.nextFloat()
-            momentum = when {
-                roll < 0.25f -> Random.nextFloat() *
-                    (ERA_MOMENTUM_RISING_DECLINING_MAX - ERA_MOMENTUM_RISING_DECLINING_MIN) +
-                    ERA_MOMENTUM_RISING_DECLINING_MIN // RISING arc
-                roll < 0.50f -> -(Random.nextFloat() *
-                    (ERA_MOMENTUM_RISING_DECLINING_MAX - ERA_MOMENTUM_RISING_DECLINING_MIN) +
-                    ERA_MOMENTUM_RISING_DECLINING_MIN) // DECLINING arc
-                else -> (Random.nextFloat() * 2f - 1f) * ERA_MOMENTUM_STABLE_RANGE // STABLE arc
+            momentum = if (isDominant) {
+                // Shift odds for dominant clubs (>=3 titles in 5 yrs): 45% DECLINING, 20% RISING, 35% STABLE
+                when {
+                    roll < 0.20f -> Random.nextFloat() *
+                        (ERA_MOMENTUM_RISING_DECLINING_MAX - ERA_MOMENTUM_RISING_DECLINING_MIN) +
+                        ERA_MOMENTUM_RISING_DECLINING_MIN // RISING arc (20%)
+                    roll < 0.65f -> -(Random.nextFloat() *
+                        (ERA_MOMENTUM_RISING_DECLINING_MAX - ERA_MOMENTUM_RISING_DECLINING_MIN) +
+                        ERA_MOMENTUM_RISING_DECLINING_MIN) // DECLINING arc (45%)
+                    else -> (Random.nextFloat() * 2f - 1f) * ERA_MOMENTUM_STABLE_RANGE // STABLE arc (35%)
+                }
+            } else {
+                when {
+                    roll < 0.25f -> Random.nextFloat() *
+                        (ERA_MOMENTUM_RISING_DECLINING_MAX - ERA_MOMENTUM_RISING_DECLINING_MIN) +
+                        ERA_MOMENTUM_RISING_DECLINING_MIN // RISING arc (25%)
+                    roll < 0.50f -> -(Random.nextFloat() *
+                        (ERA_MOMENTUM_RISING_DECLINING_MAX - ERA_MOMENTUM_RISING_DECLINING_MIN) +
+                        ERA_MOMENTUM_RISING_DECLINING_MIN) // DECLINING arc (25%)
+                    else -> (Random.nextFloat() * 2f - 1f) * ERA_MOMENTUM_STABLE_RANGE // STABLE arc (50%)
+                }
             }
             seasonsRemaining = Random.nextInt(ERA_MOMENTUM_MIN_SEASONS, ERA_MOMENTUM_MAX_SEASONS_EXCLUSIVE)
         }
@@ -2700,7 +2738,9 @@ private suspend fun adjustClubsReputations(standings: List<StandingEntity>, club
                 finalOvr = player.ovr,
                 clubsPlayed = clubsPlayedStr,
                 isCompleted = true,
-                retirementDescription = retirementDesc
+                retirementDescription = retirementDesc,
+                faceDescriptor = player.faceDescriptor,
+                finalAge = player.age
             )
             dao.insertLegacy(legacy)
 
@@ -3055,10 +3095,6 @@ private suspend fun adjustClubsReputations(standings: List<StandingEntity>, club
                         isRisingTalent = true
                     )
                     dao.insertNpcStriker(newStriker)
-
-                    val logText = "📰 ${striker.name} has retired from professional football. ${oldClub.name} promote $newName ($newAge) from their academy."
-                    seasonLogs.add(logText)
-                    narrativeLogs.add(logText)
                 }
                 continue
             }
@@ -3171,7 +3207,10 @@ private suspend fun adjustClubsReputations(standings: List<StandingEntity>, club
 
         // Unconditional cache sync for strikers
         val latestActiveStrikers = dao.getAllNpcStrikersSync().filter { !it.isRetired }
-        val strikerByClubId = latestActiveStrikers.filter { it.currentClubId != null }.associateBy { it.currentClubId!! }
+        val strikerByClubId = latestActiveStrikers
+            .filter { it.currentClubId != null }
+            .groupBy { it.currentClubId!! }
+            .mapValues { (_, strikers) -> strikers.maxByOrNull { it.ovr } }
 
         for (club in allClubs) {
             val activeStriker = strikerByClubId[club.id]
@@ -3715,11 +3754,22 @@ private suspend fun adjustClubsReputations(standings: List<StandingEntity>, club
     }
 
     suspend fun resolveChoice(optionIndex: Int) {
+        android.util.Log.d("ChoiceDebug", "resolveChoice entered with optionIndex=$optionIndex")
         db.withTransaction {
-            val player = dao.getPlayerSync() ?: return@withTransaction
-            val gameState = dao.getGameStateSync() ?: return@withTransaction
+            val player = dao.getPlayerSync() ?: run {
+                android.util.Log.e("ChoiceDebug", "resolveChoice: player is null")
+                return@withTransaction
+            }
+            val gameState = dao.getGameStateSync() ?: run {
+                android.util.Log.e("ChoiceDebug", "resolveChoice: gameState is null")
+                return@withTransaction
+            }
             
-            val prompt = gameState.activeChoicePrompt ?: return@withTransaction
+            val prompt = gameState.activeChoicePrompt ?: run {
+                android.util.Log.w("ChoiceDebug", "resolveChoice: activeChoicePrompt is null, nothing to resolve")
+                return@withTransaction
+            }
+            android.util.Log.d("ChoiceDebug", "resolveChoice: resolving prompt='$prompt', pendingLogs=${gameState.activeChoicePendingMonthLogs != null}")
             val option = when (optionIndex) {
                 1 -> gameState.activeChoiceOption1
                 2 -> gameState.activeChoiceOption2
@@ -3914,6 +3964,7 @@ private suspend fun adjustClubsReputations(standings: List<StandingEntity>, club
                 dao.updateGameState(gameState)
             }
         }
+        android.util.Log.d("ChoiceDebug", "resolveChoice: transaction completed successfully")
     }
 
     suspend fun getNextPlayerMatchInMonth(monthIndex: Int, playerClubId: Int): FixtureEntity? {
@@ -4676,9 +4727,14 @@ private suspend fun adjustClubsReputations(standings: List<StandingEntity>, club
             }
             attempts++
         }
+        // Fix the base name once instead of re-rolling every iteration — re-rolling against
+        // an already-exhausted pool was causing thousands of DB round-trips per name during
+        // long God Mode simulations. Suffixing a fixed base guarantees a unique result in a
+        // small, bounded number of iterations.
+        val baseName = FictionalData.generateRandomName(country)
         var fallbackSuffix = 1
-        while (true) {
-            val candidate = "${FictionalData.generateRandomName(country)} $fallbackSuffix"
+        while (fallbackSuffix <= 500) {
+            val candidate = "$baseName $fallbackSuffix"
             if (candidate !in blocklist) {
                 val count = dao.checkUsedNameCount(candidate)
                 if (count == 0) {
@@ -4688,6 +4744,10 @@ private suspend fun adjustClubsReputations(standings: List<StandingEntity>, club
             }
             fallbackSuffix++
         }
+        // Absolute last resort — guarantees termination even in a pathological case.
+        val fallbackCandidate = "$baseName ${System.currentTimeMillis()}"
+        dao.insertUsedName(UsedNameEntity(fallbackCandidate))
+        return fallbackCandidate
     }
 
     // One-time migration for club records with old "-N seasons ago" text
@@ -5317,6 +5377,31 @@ private suspend fun adjustClubsReputations(standings: List<StandingEntity>, club
                                 age < 24 && ovr < 75 -> {
                                     val (name, handle, init) = influencerAuthors[rng.nextInt(influencerAuthors.size)]
                                     if (isInteractiveReply) {
+                                        data class MinutesTakeVariant(
+                                            val content: String,
+                                            val reply1: String, val reply2: String, val reply3: String
+                                        )
+                                        val minutesTakeVariants = listOf(
+                                            MinutesTakeVariant(
+                                                content = "Pundit Take: Young ${player.name} ($age) has huge promise at $clubName, but should the manager start him regularly or manage his minutes?",
+                                                reply1 = "Ambitious: 'I am ready whenever the gaffer calls my name.'",
+                                                reply2 = "Patient: 'Trusting the manager's development process completely.'",
+                                                reply3 = "Bold: 'Put me on the pitch and I will deliver.'"
+                                            ),
+                                            MinutesTakeVariant(
+                                                content = "Debate Corner: ${player.name} ($age) keeps flashing potential at $clubName — is it time to make him a starter, or is patience still the right call?",
+                                                reply1 = "Confident: 'I back myself to take that chance every time.'",
+                                                reply2 = "Team First: 'Whatever the manager needs, I'll deliver.'",
+                                                reply3 = "Blunt: 'Minutes are earned in training. I'm earning them.'"
+                                            ),
+                                            MinutesTakeVariant(
+                                                content = "Analyst Notebook: the numbers say ${player.name} ($age) is ready for more minutes at $clubName. Does the manager agree?",
+                                                reply1 = "Composed: 'The numbers will keep coming if I get the chance.'",
+                                                reply2 = "Respectful: 'That call belongs to the manager, not me.'",
+                                                reply3 = "Hungry: 'Every training session, I'm making it harder to leave me out.'"
+                                            )
+                                        )
+                                        val variant = minutesTakeVariants.random(rng)
                                         SocialPostEntity(
                                             sequenceIndex = currentSeq,
                                             seasonNumber = gameState.currentSeason,
@@ -5325,19 +5410,19 @@ private suspend fun adjustClubsReputations(standings: List<StandingEntity>, club
                                             authorName = name,
                                             authorHandle = handle,
                                             authorInitials = init,
-                                            content = "Pundit Take: Young ${player.name} ($age) has huge promise at $clubName, but should the manager start him regularly or manage his minutes?",
+                                            content = variant.content,
                                             isAboutPlayerOrClub = true,
                                             relatedClubId = club?.id,
                                             likeCount = scaledLikeCount(rng, 1500, 14000, 1.1f, player),
                                             isReplyable = true,
-                                            reply1Text = "Ambitious: 'I am ready whenever the gaffer calls my name.'",
+                                            reply1Text = variant.reply1,
                                             reply1MoraleMod = 4,
                                             reply1FanRepMod = 4,
                                             reply1ManagerTrustMod = 3,
-                                            reply2Text = "Patient: 'Trusting the manager's development process completely.'",
+                                            reply2Text = variant.reply2,
                                             reply2ManagerTrustMod = 6,
                                             reply2MoraleMod = 2,
-                                            reply3Text = "Bold: 'Put me on the pitch and I will deliver.'",
+                                            reply3Text = variant.reply3,
                                             reply3FanRepMod = 5,
                                             reply3MoraleMod = 3,
                                             reply3ManagerTrustMod = -1

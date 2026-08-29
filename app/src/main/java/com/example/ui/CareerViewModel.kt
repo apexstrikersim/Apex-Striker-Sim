@@ -545,7 +545,8 @@ class CareerViewModel(application: Application) : AndroidViewModel(application) 
         academy: String,
         preferredFoot: String = "Right",
         squadNumber: Int = 9,
-        backgroundStory: String = "Street Cages"
+        backgroundStory: String = "Street Cages",
+        faceDescriptor: String = ""
     ) {
         viewModelScope.launch {
             _activeMatch.value = null
@@ -557,7 +558,8 @@ class CareerViewModel(application: Application) : AndroidViewModel(application) 
                 isSon = false,
                 preferredFoot = preferredFoot,
                 squadNumber = squadNumber,
-                backgroundStory = backgroundStory
+                backgroundStory = backgroundStory,
+                faceDescriptor = faceDescriptor
             )
             _selectedStandingCountry.value = academy
             _activeScreen.value = Screen.GAMEPLAY
@@ -583,7 +585,8 @@ class CareerViewModel(application: Application) : AndroidViewModel(application) 
                 isSon = true,
                 fatherFinalOvr = father.ovr,
                 fatherTrophiesWeight = weight,
-                fatherPotentialCeiling = father.potentialCeiling
+                fatherPotentialCeiling = father.potentialCeiling,
+                fatherFaceDescriptor = father.faceDescriptor
             )
             _selectedStandingCountry.value = father.academyCountry
             _activeScreen.value = Screen.GAMEPLAY

@@ -155,10 +155,10 @@ fun LeagueTab(viewModel: CareerViewModel, player: PlayerEntity) {
                         .padding(horizontal = 8.dp, vertical = 6.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(text = "POS", modifier = Modifier.width(48.dp), fontWeight = FontWeight.Bold, fontSize = 11.sp, color = TextSecondary)
+                    Text(text = "POS", modifier = Modifier.width(56.dp), fontWeight = FontWeight.Bold, fontSize = 11.sp, color = TextSecondary)
                     Text(text = "CLUB", modifier = Modifier.weight(1f), fontWeight = FontWeight.Bold, fontSize = 11.sp, color = TextSecondary)
                     Text(text = "PL", modifier = Modifier.width(30.dp), fontWeight = FontWeight.Bold, fontSize = 11.sp, color = TextSecondary, textAlign = TextAlign.Center)
-                    Text(text = "GD", modifier = Modifier.width(30.dp), fontWeight = FontWeight.Bold, fontSize = 11.sp, color = TextSecondary, textAlign = TextAlign.Center)
+                    Text(text = "GD", modifier = Modifier.width(38.dp), fontWeight = FontWeight.Bold, fontSize = 11.sp, color = TextSecondary, textAlign = TextAlign.Center)
                     Text(text = "PTS", modifier = Modifier.width(35.dp), fontWeight = FontWeight.Bold, fontSize = 11.sp, color = TextSecondary, textAlign = TextAlign.Center)
                 }
             }
@@ -265,8 +265,11 @@ fun LeagueTab(viewModel: CareerViewModel, player: PlayerEntity) {
                         val gdSign = if (gd > 0) "+$gd" else "$gd"
                         Text(
                             text = gdSign,
-                            modifier = Modifier.width(30.dp),
-                            fontSize = 12.sp,
+                            modifier = Modifier.width(38.dp),
+                            fontSize = if (gdSign.length > 4) 10.sp else 12.sp,
+                            maxLines = 1,
+                            softWrap = false,
+                            overflow = TextOverflow.Visible,
                             textAlign = TextAlign.Center,
                             color = if (gd > 0) PitchGreen else if (gd < 0) MutedRed else TextSecondary
                         )
@@ -486,8 +489,11 @@ fun LeagueTab(viewModel: CareerViewModel, player: PlayerEntity) {
                                     if (isDoubleLeg && leg2 != null) {
                                         val l1ScoreA = leg1.homeScore
                                         val l1ScoreB = leg1.awayScore
-                                        val l2ScoreA = leg2.awayScore // leg 1 home is leg 2 away
-                                        val l2ScoreB = leg2.homeScore
+                                        val l2ScoreA = if (leg2.homeClubId == leg1.homeClubId) leg2.homeScore else leg2.awayScore
+                                        val l2ScoreB = if (leg2.homeClubId == leg1.homeClubId) leg2.awayScore else leg2.homeScore
+                                        val leg2HomeClub = clubsMap[leg2.homeClubId]
+                                        val leg2HomeScore = leg2.homeScore
+                                        val leg2AwayScore = leg2.awayScore
 
                                         Row(
                                             modifier = Modifier.fillMaxWidth(),
@@ -502,7 +508,7 @@ fun LeagueTab(viewModel: CareerViewModel, player: PlayerEntity) {
                                                     color = TextSecondary
                                                 )
                                                 val leg2Text = if (leg2.isSimulated) {
-                                                    val baseScore = "$l2ScoreB - $l2ScoreA"
+                                                    val baseScore = "$leg2HomeScore - $leg2AwayScore"
                                                     if (leg2.homePens != null && leg2.awayPens != null) {
                                                         "$baseScore (a.e.t., ${leg2.homePens}-${leg2.awayPens} pens)"
                                                     } else if (leg2.wentToExtraTime) {
@@ -514,7 +520,7 @@ fun LeagueTab(viewModel: CareerViewModel, player: PlayerEntity) {
                                                     "Pending (Month ${getMonthName(leg2.monthIndex)})"
                                                 }
                                                 Text(
-                                                    text = "Leg 2 (Home ${clubB?.name?.take(3)?.uppercase()}): $leg2Text",
+                                                    text = "Leg 2 (Home ${leg2HomeClub?.name?.take(3)?.uppercase()}): $leg2Text",
                                                     fontSize = 11.sp,
                                                     color = TextSecondary
                                                 )
@@ -523,8 +529,11 @@ fun LeagueTab(viewModel: CareerViewModel, player: PlayerEntity) {
                                             if (leg1.isSimulated && leg2.isSimulated) {
                                                 val aggA = (l1ScoreA ?: 0) + (l2ScoreA ?: 0)
                                                 val aggB = (l1ScoreB ?: 0) + (l2ScoreB ?: 0)
-                                                val aggText = if (leg2.homePens != null && leg2.awayPens != null) {
-                                                    "AGG: $aggA - $aggB (${leg2.awayPens}-${leg2.homePens} pens)"
+                                                val pensA = if (leg2.homeClubId == leg1.homeClubId) leg2.homePens else leg2.awayPens
+                                                val pensB = if (leg2.homeClubId == leg1.homeClubId) leg2.awayPens else leg2.homePens
+
+                                                val aggText = if (pensA != null && pensB != null) {
+                                                    "AGG: $aggA - $aggB ($pensA-$pensB pens)"
                                                 } else if (leg2.wentToExtraTime) {
                                                     "AGG: $aggA - $aggB (a.e.t.)"
                                                 } else {

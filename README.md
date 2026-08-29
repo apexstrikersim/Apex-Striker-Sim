@@ -188,4 +188,10 @@ The app is architecturally a **single-activity / single-compose-root**: `MainGam
 
 ---
 
+## Contact & Support
+
+For questions, feedback, or support inquiries, contact **Apexstrikersim@gmail.com**.
+
+---
+
 *Apex Striker Career is an amateur, passion-project simulator. No real player or club data is used; all names and leagues are fictitious.*

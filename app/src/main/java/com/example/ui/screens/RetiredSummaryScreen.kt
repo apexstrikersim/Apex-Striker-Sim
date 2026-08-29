@@ -66,7 +66,7 @@ fun RetiredSummaryScreen(viewModel: CareerViewModel, player: PlayerEntity?) {
                     )
 
                     Spacer(modifier = Modifier.height(8.dp))
-                    Divider(color = BorderColor)
+                    HorizontalDivider(color = BorderColor)
                     Spacer(modifier = Modifier.height(8.dp))
                 }
 

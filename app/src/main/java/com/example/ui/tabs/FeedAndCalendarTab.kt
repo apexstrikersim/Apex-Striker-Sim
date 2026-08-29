@@ -25,6 +25,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ui.CareerViewModel
+import com.example.ui.SocialMediaScreen
 import com.example.ui.theme.DarkSlate
 import com.example.ui.theme.PitchGreen
 import com.example.ui.theme.SportsDarkBg
@@ -72,7 +73,7 @@ fun FeedAndCalendarTab(viewModel: CareerViewModel) {
         if (showCalendar) {
             CalendarTab(viewModel = viewModel)
         } else {
-            SocialFeedTab(viewModel = viewModel)
+            SocialMediaScreen(viewModel = viewModel)
         }
     }
 }

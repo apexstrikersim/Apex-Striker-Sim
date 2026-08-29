@@ -226,31 +226,40 @@ fun PreMatchScreen(
                 modifier = Modifier.padding(24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
+                val isPlayerHome = fixture.homeClubId == player.currentClubId
+                val homeClub = if (isPlayerHome) myClub else oppClub
+                val awayClub = if (isPlayerHome) oppClub else myClub
+
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceEvenly,
                     verticalAlignment = Alignment.Top
                 ) {
                     // Home
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
                         ClubCrestIcon(
-                            clubId = myClub.id,
-                            clubName = myClub.name,
+                            clubId = homeClub.id,
+                            clubName = homeClub.name,
                             size = 64.dp
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            text = myClub.name,
+                            text = homeClub.name,
                             fontSize = 14.sp,
                             fontWeight = FontWeight.Bold,
-                            color = PitchGreen,
-                            textAlign = TextAlign.Center
+                            color = if (isPlayerHome) PitchGreen else TextPrimary,
+                            textAlign = TextAlign.Center,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis
                         )
                         Text(
-                            text = "YOUR TEAM",
+                            text = if (isPlayerHome) "YOUR TEAM (HOME)" else "HOME",
                             fontSize = 10.sp,
                             fontWeight = FontWeight.Bold,
-                            color = TrophyGold,
+                            color = if (isPlayerHome) TrophyGold else TextSecondary,
                             textAlign = TextAlign.Center
                         )
                     }
@@ -260,35 +269,41 @@ fun PreMatchScreen(
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Black,
                         color = TextSecondary,
-                        modifier = Modifier.padding(top = 22.dp)
+                        modifier = Modifier
+                            .padding(horizontal = 8.dp)
+                            .padding(top = 22.dp)
                     )
 
                     // Away
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
                         ClubCrestIcon(
-                            clubId = oppClub.id,
-                            clubName = oppClub.name,
+                            clubId = awayClub.id,
+                            clubName = awayClub.name,
                             size = 64.dp
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            text = oppClub.name,
+                            text = awayClub.name,
                             fontSize = 14.sp,
                             fontWeight = FontWeight.Bold,
-                            color = TextPrimary,
-                            textAlign = TextAlign.Center
+                            color = if (!isPlayerHome) PitchGreen else TextPrimary,
+                            textAlign = TextAlign.Center,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis
                         )
                         Text(
-                            text = "YOUR TEAM",
+                            text = if (!isPlayerHome) "YOUR TEAM (AWAY)" else "AWAY",
                             fontSize = 10.sp,
                             fontWeight = FontWeight.Bold,
-                            color = Color.Transparent,
+                            color = if (!isPlayerHome) TrophyGold else TextSecondary,
                             textAlign = TextAlign.Center
                         )
                     }
                 }
 
-                val isPlayerHome = fixture.homeClubId == player.currentClubId
                 if (player.fanReputation >= 70 && isPlayerHome) {
                     Spacer(modifier = Modifier.height(16.dp))
                     HorizontalDivider(color = BorderColor.copy(alpha = 0.5f), thickness = 1.dp)
@@ -1478,8 +1493,8 @@ fun LiveMatchSimulation(
                     Spacer(modifier = Modifier.height(12.dp))
 
                     // SCHEMATIC PITCH WHITEBOARD GRAPHIC
-                    val homeCrestColors = remember(fixture.homeClubId) { getClubColors(fixture.homeClubId) }
-                    val awayCrestColors = remember(fixture.awayClubId) { getClubColors(fixture.awayClubId) }
+                    val homeCrestColors = remember(fixture.homeClubId, homeClub.name) { getClubColors(fixture.homeClubId, homeClub.name) }
+                    val awayCrestColors = remember(fixture.awayClubId, awayClub.name) { getClubColors(fixture.awayClubId, awayClub.name) }
 
                     val (homePitchColor, awayPitchColor) = remember(homeCrestColors, awayCrestColors) {
                         val rDiff = kotlin.math.abs(homeCrestColors.first.red - awayCrestColors.first.red)

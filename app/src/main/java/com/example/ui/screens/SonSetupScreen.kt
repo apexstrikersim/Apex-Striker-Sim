@@ -62,7 +62,7 @@ fun SonSetupScreen(viewModel: CareerViewModel, father: PlayerEntity?) {
                     letterSpacing = 1.sp
                 )
 
-                Divider(color = BorderColor)
+                HorizontalDivider(color = BorderColor)
 
                 Text(
                     text = "Your son will inherit starting stat advantages, scaled directly by your father's peak achievements and total trophies won!",

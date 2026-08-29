@@ -35,11 +35,13 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.data.FaceDescriptor
 import com.example.data.GameStateEntity
 import com.example.data.PlayerEntity
 import com.example.data.TrophyEntity
 import com.example.data.formatSeasonYear
 import com.example.ui.CareerViewModel
+import com.example.ui.components.PlayerFaceIcon
 import com.example.ui.tabs.CompetitionTrophyIcon
 import com.example.ui.theme.*
 
@@ -144,6 +146,19 @@ fun FamilyLegacyPage(
                 } else {
                     generationList.forEachIndexed { index, gen ->
                         val isSelected = expandedGeneration == gen.generation
+                        val faceDesc = if (gen.legacy != null) {
+                            FaceDescriptor.deserialize(gen.legacy.faceDescriptor)
+                        } else if (gen.player != null) {
+                            FaceDescriptor.deserialize(gen.player.faceDescriptor)
+                        } else {
+                            FaceDescriptor.random("ENG")
+                        }
+                        val faceAge = if (gen.legacy != null) {
+                            if (gen.legacy.finalAge > 0) gen.legacy.finalAge else 35
+                        } else {
+                            gen.player?.age ?: 18
+                        }
+                        val faceForm = if (gen.legacy != null) 0 else (gen.player?.form ?: 0)
 
                         Column(
                             modifier = Modifier.fillMaxWidth(),
@@ -167,11 +182,27 @@ fun FamilyLegacyPage(
                                 ) {
                                     Row(
                                         verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                        horizontalArrangement = Arrangement.spacedBy(10.dp)
                                     ) {
                                         Box(
                                             modifier = Modifier
-                                                .size(32.dp)
+                                                .size(38.dp)
+                                                .clip(RoundedCornerShape(8.dp))
+                                                .background(DarkSlate)
+                                                .border(1.dp, if (isSelected) PitchGreen else BorderColor, RoundedCornerShape(8.dp)),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            PlayerFaceIcon(
+                                                descriptor = faceDesc,
+                                                age = faceAge,
+                                                form = faceForm,
+                                                modifier = Modifier.size(34.dp)
+                                            )
+                                        }
+
+                                        Box(
+                                            modifier = Modifier
+                                                .size(30.dp)
                                                 .background(
                                                     if (isSelected) PitchGreen else DarkSlate,
                                                     CircleShape
@@ -181,7 +212,7 @@ fun FamilyLegacyPage(
                                         ) {
                                             Text(
                                                 text = "G${gen.generation}",
-                                                fontSize = 12.sp,
+                                                fontSize = 11.sp,
                                                 fontWeight = FontWeight.Bold,
                                                 color = if (isSelected) Color.Black else TextPrimary
                                             )
@@ -296,27 +327,61 @@ fun FamilyLegacyPage(
                         modifier = Modifier.padding(16.dp),
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
+                        val detailFaceDesc = if (gen.legacy != null) {
+                            FaceDescriptor.deserialize(gen.legacy.faceDescriptor)
+                        } else if (gen.player != null) {
+                            FaceDescriptor.deserialize(gen.player.faceDescriptor)
+                        } else {
+                            FaceDescriptor.random("ENG")
+                        }
+                        val detailFaceAge = if (gen.legacy != null) {
+                            if (gen.legacy.finalAge > 0) gen.legacy.finalAge else 35
+                        } else {
+                            gen.player?.age ?: 18
+                        }
+                        val detailFaceForm = if (gen.legacy != null) 0 else (gen.player?.form ?: 0)
+
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Column {
-                                Text(
-                                    text = "GEN ${gen.generation} • ${gen.name.uppercase()}",
-                                    fontSize = 15.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = PitchGreen
-                                )
-                                Text(
-                                    text = if (gen.isRetired) "Retired Legend" else "Active Career",
-                                    fontSize = 11.sp,
-                                    color = TextSecondary
-                                )
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(46.dp)
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .background(DarkSlate)
+                                        .border(1.dp, PitchGreen.copy(alpha = 0.6f), RoundedCornerShape(10.dp)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    PlayerFaceIcon(
+                                        descriptor = detailFaceDesc,
+                                        age = detailFaceAge,
+                                        form = detailFaceForm,
+                                        modifier = Modifier.size(40.dp)
+                                    )
+                                }
+                                Column {
+                                    Text(
+                                        text = "GEN ${gen.generation} • ${gen.name.uppercase()}",
+                                        fontSize = 15.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = PitchGreen
+                                    )
+                                    Text(
+                                        text = if (gen.isRetired) "Retired Legend" else "Active Career",
+                                        fontSize = 11.sp,
+                                        color = TextSecondary
+                                    )
+                                }
                             }
                         }
 
-                        Divider(color = BorderColor)
+                        HorizontalDivider(color = BorderColor)
 
                         // a. BIOGRAPHY
                         if (gen.isRetired) {
@@ -441,7 +506,7 @@ fun FamilyLegacyPage(
                                                             modifier = Modifier.weight(0.7f)
                                                         )
                                                     }
-                                                    Divider(color = BorderColor.copy(alpha = 0.3f))
+                                                    HorizontalDivider(color = BorderColor.copy(alpha = 0.3f))
                                                 }
                                             }
                                         }

@@ -2,8 +2,10 @@ package com.example.ui
 
 import com.example.ui.components.ClubCrestIcon
 
+import androidx.compose.animation.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -424,6 +426,12 @@ data class ClubTrophyItem(
     val isUserContributed: Boolean
 )
 
+data class TrophyGroupItem(
+    val competitionName: String,
+    val totalWins: Int,
+    val items: List<ClubTrophyItem>
+)
+
 @Composable
 fun TrophiesTabContent(club: ClubEntity, history: List<ClubSeasonHistoryEntity>, trophies: List<TrophyEntity>) {
     val clubTrophies = remember(history, trophies) {
@@ -456,7 +464,21 @@ fun TrophiesTabContent(club: ClubEntity, history: List<ClubSeasonHistoryEntity>,
         list.sortedWith(compareByDescending<ClubTrophyItem> { it.seasonYear }.thenBy { it.competitionName })
     }
 
-    if (clubTrophies.isEmpty()) {
+    val trophyGroups = remember(clubTrophies) {
+        clubTrophies.groupBy { it.competitionName }
+            .map { (compName, items) ->
+                TrophyGroupItem(
+                    competitionName = compName,
+                    totalWins = items.size,
+                    items = items.sortedByDescending { it.seasonYear }
+                )
+            }
+            .sortedByDescending { it.totalWins }
+    }
+
+    var expandedComps by remember { mutableStateOf(setOf<String>()) }
+
+    if (trophyGroups.isEmpty()) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -485,7 +507,7 @@ fun TrophiesTabContent(club: ClubEntity, history: List<ClubSeasonHistoryEntity>,
     } else {
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             item {
                 Row(
@@ -500,7 +522,7 @@ fun TrophiesTabContent(club: ClubEntity, history: List<ClubSeasonHistoryEntity>,
                         modifier = Modifier.size(16.dp)
                     )
                     Text(
-                        text = "TROPHY CABINET (${clubTrophies.size})",
+                        text = "TROPHY CABINET (${clubTrophies.size} TOTAL)",
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
                         color = TrophyGold,
@@ -509,92 +531,149 @@ fun TrophiesTabContent(club: ClubEntity, history: List<ClubSeasonHistoryEntity>,
                 }
             }
 
-            items(clubTrophies) { trophyItem ->
+            items(trophyGroups) { group ->
+                val isExpanded = expandedComps.contains(group.competitionName)
+                val userWins = group.items.count { it.isUserContributed }
+
                 Card(
                     colors = CardDefaults.cardColors(containerColor = SportsCardBg),
-                    shape = RoundedCornerShape(8.dp),
+                    shape = RoundedCornerShape(10.dp),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .border(1.dp, BorderColor, RoundedCornerShape(8.dp))
+                        .border(1.dp, BorderColor, RoundedCornerShape(10.dp))
                 ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(12.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        // Large Trophy Icon
-                        Box(
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        Row(
                             modifier = Modifier
-                                .size(40.dp)
-                                .clip(CircleShape)
-                                .background(TrophyGold.copy(alpha = 0.15f)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Star,
-                                contentDescription = "Trophy icon",
-                                tint = TrophyGold,
-                                modifier = Modifier.size(20.dp)
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.width(12.dp))
-
-                        Column(
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Text(
-                                text = trophyItem.competitionName,
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = TextPrimary
-                            )
-                            Spacer(modifier = Modifier.height(2.dp))
-
-                            val matchingTrophy = if (trophyItem.isUserContributed) {
-                                trophies.find {
-                                    it.seasonYear == trophyItem.seasonYear &&
-                                    (if (trophyItem.competitionName.contains("League")) it.competitionName.contains("League") else it.competitionName == trophyItem.competitionName)
+                                .fillMaxWidth()
+                                .clickable {
+                                    expandedComps = if (isExpanded) {
+                                        expandedComps - group.competitionName
+                                    } else {
+                                        expandedComps + group.competitionName
+                                    }
                                 }
-                            } else null
-
-                            if (matchingTrophy != null) {
-                                Text(
-                                    text = "Won by: ${matchingTrophy.playerName} (Gen ${matchingTrophy.generation})",
-                                    fontSize = 12.sp,
-                                    color = TextSecondary
+                                .padding(14.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            // Large Trophy Icon
+                            Box(
+                                modifier = Modifier
+                                    .size(40.dp)
+                                    .clip(CircleShape)
+                                    .background(TrophyGold.copy(alpha = 0.15f)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Star,
+                                    contentDescription = "Trophy icon",
+                                    tint = TrophyGold,
+                                    modifier = Modifier.size(22.dp)
                                 )
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Box(
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(4.dp))
-                                        .background(PitchGreen.copy(alpha = 0.15f))
-                                        .border(1.dp, PitchGreen.copy(alpha = 0.5f), RoundedCornerShape(4.dp))
-                                        .padding(horizontal = 6.dp, vertical = 2.dp)
-                                ) {
-                                    Text(
-                                        text = "Won with your contribution 👤",
-                                        fontSize = 10.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = PitchGreen
-                                    )
-                                }
-                            } else {
+                            }
+
+                            Spacer(modifier = Modifier.width(12.dp))
+
+                            Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    text = "Simulated Club Title",
+                                    text = group.competitionName,
+                                    fontSize = 15.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = TextPrimary
+                                )
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = if (userWins > 0) {
+                                        "${group.totalWins} ${if (group.totalWins == 1) "title" else "titles"} ($userWins with your legacy)"
+                                    } else {
+                                        "${group.totalWins} ${if (group.totalWins == 1) "title" else "titles"}"
+                                    },
                                     fontSize = 12.sp,
-                                    color = TextSecondary
+                                    color = if (userWins > 0) PitchGreen else TextSecondary
+                                )
+                            }
+
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Text(
+                                    text = "×${group.totalWins}",
+                                    fontSize = 16.sp,
+                                    fontWeight = FontWeight.Black,
+                                    color = TrophyGold
+                                )
+                                Icon(
+                                    imageVector = if (isExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                                    contentDescription = if (isExpanded) "Collapse" else "Expand",
+                                    tint = TextSecondary,
+                                    modifier = Modifier.size(20.dp)
                                 )
                             }
                         }
 
-                        Text(
-                            text = com.example.data.formatSeasonYear(trophyItem.seasonYear),
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = TrophyGold
-                        )
+                        AnimatedVisibility(visible = isExpanded) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 14.dp, vertical = 8.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                HorizontalDivider(color = BorderColor.copy(alpha = 0.6f), thickness = 1.dp)
+
+                                group.items.forEach { item ->
+                                    val matchingTrophy = if (item.isUserContributed) {
+                                        trophies.find {
+                                            it.seasonYear == item.seasonYear &&
+                                            (if (item.competitionName.contains("League")) it.competitionName.contains("League") else it.competitionName == item.competitionName)
+                                        }
+                                    } else null
+
+                                    val yearColor = if (matchingTrophy != null) PitchGreen else TrophyGold
+
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clip(RoundedCornerShape(6.dp))
+                                            .background(DarkSlate.copy(alpha = 0.5f))
+                                            .padding(horizontal = 10.dp, vertical = 8.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = com.example.data.formatSeasonYear(item.seasonYear),
+                                            fontSize = 13.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = yearColor,
+                                            modifier = Modifier.width(90.dp)
+                                        )
+
+                                        if (matchingTrophy != null) {
+                                            Column(modifier = Modifier.weight(1f)) {
+                                                Text(
+                                                    text = "Won by ${matchingTrophy.playerName} (Gen ${matchingTrophy.generation})",
+                                                    fontSize = 12.sp,
+                                                    fontWeight = FontWeight.SemiBold,
+                                                    color = TextPrimary
+                                                )
+                                                Text(
+                                                    text = "Won with your contribution 👤",
+                                                    fontSize = 10.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = PitchGreen
+                                                )
+                                            }
+                                        } else {
+                                            Text(
+                                                text = "Simulated Club Title",
+                                                fontSize = 12.sp,
+                                                color = TextSecondary,
+                                                modifier = Modifier.weight(1f)
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }

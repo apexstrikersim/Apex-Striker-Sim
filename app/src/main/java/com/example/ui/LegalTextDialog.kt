@@ -70,7 +70,7 @@ fun LegalTextDialog(
                     }
                 }
 
-                Divider(color = BorderColor, modifier = Modifier.padding(vertical = 12.dp))
+                HorizontalDivider(color = BorderColor, modifier = Modifier.padding(vertical = 12.dp))
 
                 Box(
                     modifier = Modifier
