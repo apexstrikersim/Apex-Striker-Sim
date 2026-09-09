@@ -1,14 +1,18 @@
 package com.example.ui.screens
 
+import androidx.compose.foundation.border
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChildCare
+import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
@@ -19,6 +23,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.data.FictionalData
 import com.example.data.PlayerEntity
 import com.example.ui.CareerViewModel
 import com.example.ui.theme.*
@@ -28,7 +33,12 @@ fun SonSetupScreen(viewModel: CareerViewModel, father: PlayerEntity?) {
     if (father == null) return
     val keyboardController = LocalSoftwareKeyboardController.current
     val focusManager = LocalFocusManager.current
-    var sonName by remember { mutableStateOf("") }
+
+    val fatherLastName = father.lastName.ifBlank {
+        father.name.split(" ").drop(1).joinToString(" ").ifBlank { father.name }
+    }
+    var sonFirstName by remember { mutableStateOf("") }
+    var sonLastName by remember { mutableStateOf(fatherLastName) }
 
     Box(
         modifier = Modifier
@@ -72,13 +82,61 @@ fun SonSetupScreen(viewModel: CareerViewModel, father: PlayerEntity?) {
                     lineHeight = 20.sp
                 )
 
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    OutlinedTextField(
+                        value = sonFirstName,
+                        onValueChange = { input ->
+                            val filtered = input.filter { it.isLetter() || it == '-' || it == '\'' }
+                            if (filtered.length <= 16) sonFirstName = filtered
+                        },
+                        label = { Text("First Name", color = TextSecondary) },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(
+                            keyboardType = KeyboardType.Text,
+                            capitalization = KeyboardCapitalization.Words
+                        ),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = PitchGreen,
+                            unfocusedBorderColor = BorderColor,
+                            focusedTextColor = TextPrimary,
+                            unfocusedTextColor = TextPrimary
+                        ),
+                        modifier = Modifier
+                            .weight(1f)
+                            .testTag("son_first_name_input")
+                    )
+
+                    IconButton(
+                        onClick = {
+                            sonFirstName = FictionalData.generateRandomFirstName(father.academyCountry)
+                        },
+                        modifier = Modifier
+                            .size(44.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(DarkSlate)
+                            .border(1.dp, BorderColor, RoundedCornerShape(8.dp))
+                            .testTag("randomize_son_name_button")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Shuffle,
+                            contentDescription = "Randomize Name",
+                            tint = PitchGreen,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
+
                 OutlinedTextField(
-                    value = sonName,
+                    value = sonLastName,
                     onValueChange = { input ->
-                        val filtered = input.filter { it.isLetter() || it == ' ' || it == '-' || it == '\'' }
-                        if (filtered.length <= 24) sonName = filtered
+                        val filtered = input.filter { it.isLetter() || it == '-' || it == '\'' || it == ' ' }
+                        if (filtered.length <= 20) sonLastName = filtered
                     },
-                    label = { Text("Son's Name", color = TextSecondary) },
+                    label = { Text("Last Name (Family)", color = TextSecondary) },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(
                         keyboardType = KeyboardType.Text,
@@ -95,15 +153,22 @@ fun SonSetupScreen(viewModel: CareerViewModel, father: PlayerEntity?) {
                         .testTag("son_name_input")
                 )
 
+                val isSonValid = sonFirstName.trim().isNotBlank() && sonLastName.trim().isNotBlank()
                 Button(
                     onClick = {
-                        if (sonName.isNotBlank()) {
+                        if (isSonValid) {
                             keyboardController?.hide()
                             focusManager.clearFocus()
-                            viewModel.createSon(sonName.trim())
+                            val fName = sonFirstName.trim()
+                            val lName = sonLastName.trim()
+                            viewModel.createSon(
+                                sonName = "$fName $lName",
+                                firstName = fName,
+                                lastName = lName
+                            )
                         }
                     },
-                    enabled = sonName.isNotBlank(),
+                    enabled = isSonValid,
                     colors = ButtonDefaults.buttonColors(containerColor = PitchGreen, contentColor = Color.Black),
                     shape = RoundedCornerShape(12.dp),
                     modifier = Modifier

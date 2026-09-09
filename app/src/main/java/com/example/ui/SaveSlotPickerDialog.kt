@@ -1,15 +1,17 @@
 package com.example.ui
 
 import android.text.format.DateUtils
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -23,17 +25,20 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.example.data.SaveSlotManager
 import com.example.data.SlotMetadata
-import com.example.ui.components.bounceClick
 import com.example.ui.theme.*
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun SaveSlotPickerDialog(
     mode: String, // "NEW", "LOAD", "SAVE"
     saveSlotManager: SaveSlotManager,
     onSlotSelected: (Int) -> Unit,
+    onDeleteSlot: (Int) -> Unit = {},
     onDismiss: () -> Unit
 ) {
     var overwriteConfirmSlot by remember { mutableStateOf<Int?>(null) }
+    var deleteConfirmSlot by remember { mutableStateOf<Int?>(null) }
+    var refreshKey by remember { mutableIntStateOf(0) }
 
     Dialog(onDismissRequest = onDismiss) {
         Card(
@@ -62,16 +67,25 @@ fun SaveSlotPickerDialog(
                             contentDescription = null,
                             tint = PitchGreen
                         )
-                        Text(
-                            text = when (mode) {
-                                "NEW" -> "SELECT SAVE SLOT FOR NEW CAREER"
-                                "SAVE" -> "SELECT SLOT TO SAVE GAME"
-                                else -> "LOAD CAREER SAVE"
-                            },
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 14.sp,
-                            color = PitchGreen
-                        )
+                        Column {
+                            Text(
+                                text = when (mode) {
+                                    "NEW" -> "SELECT SAVE SLOT"
+                                    "SAVE" -> "SELECT SLOT TO SAVE"
+                                    else -> "SAVED CAREERS"
+                                },
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 14.sp,
+                                color = PitchGreen
+                            )
+                            if (mode == "LOAD") {
+                                Text(
+                                    text = "Tap to load • Long-press to delete",
+                                    fontSize = 11.sp,
+                                    color = TextSecondary
+                                )
+                            }
+                        }
                     }
                     IconButton(onClick = onDismiss, modifier = Modifier.size(28.dp)) {
                         Icon(
@@ -84,27 +98,32 @@ fun SaveSlotPickerDialog(
 
                 HorizontalDivider(color = BorderColor)
 
-                LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    items(5) { index ->
-                        val slotId = index + 1
-                        val metadata = remember(slotId) { saveSlotManager.getSlotMetadata(slotId) }
-                        val isEnabled = when (mode) {
-                            "LOAD" -> metadata.hasData
-                            else -> true
-                        }
-
-                        SlotCard(
-                            slotId = slotId,
-                            metadata = metadata,
-                            isEnabled = isEnabled,
-                            onClick = {
-                                if (mode == "NEW" && metadata.hasData) {
-                                    overwriteConfirmSlot = slotId
-                                } else {
-                                    onSlotSelected(slotId)
-                                }
+                key(refreshKey) {
+                    LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        items(5) { index ->
+                            val slotId = index + 1
+                            val metadata = remember(slotId, refreshKey) { saveSlotManager.getSlotMetadata(slotId) }
+                            val isEnabled = when (mode) {
+                                "LOAD" -> metadata.hasData
+                                else -> true
                             }
-                        )
+
+                            SlotCard(
+                                slotId = slotId,
+                                metadata = metadata,
+                                isEnabled = isEnabled,
+                                onClick = {
+                                    if (mode == "NEW" && metadata.hasData) {
+                                        overwriteConfirmSlot = slotId
+                                    } else {
+                                        onSlotSelected(slotId)
+                                    }
+                                },
+                                onLongClick = if (metadata.hasData) {
+                                    { deleteConfirmSlot = slotId }
+                                } else null
+                            )
+                        }
                     }
                 }
             }
@@ -137,14 +156,46 @@ fun SaveSlotPickerDialog(
             containerColor = DarkSlate
         )
     }
+
+    deleteConfirmSlot?.let { slotId ->
+        val metadata = saveSlotManager.getSlotMetadata(slotId)
+        AlertDialog(
+            onDismissRequest = { deleteConfirmSlot = null },
+            icon = {
+                Icon(Icons.Default.DeleteOutline, contentDescription = "Delete", tint = MutedRed)
+            },
+            title = { Text("Delete Slot $slotId?", fontWeight = FontWeight.Bold, color = TextPrimary) },
+            text = { Text("Are you sure you want to permanently delete ${metadata.playerName}'s career save? This cannot be undone.", color = TextSecondary) },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        onDeleteSlot(slotId)
+                        deleteConfirmSlot = null
+                        refreshKey++
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MutedRed)
+                ) {
+                    Text("DELETE", fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { deleteConfirmSlot = null }) {
+                    Text("CANCEL", color = TextSecondary)
+                }
+            },
+            containerColor = DarkSlate
+        )
+    }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun SlotCard(
     slotId: Int,
     metadata: SlotMetadata,
     isEnabled: Boolean,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    onLongClick: (() -> Unit)? = null
 ) {
     Card(
         colors = CardDefaults.cardColors(
@@ -153,7 +204,12 @@ private fun SlotCard(
         shape = RoundedCornerShape(12.dp),
         modifier = Modifier
             .fillMaxWidth()
-            .bounceClick(onClick = if (isEnabled) onClick else null)
+            .clip(RoundedCornerShape(12.dp))
+            .combinedClickable(
+                enabled = isEnabled,
+                onClick = onClick,
+                onLongClick = onLongClick
+            )
             .border(
                 width = 1.dp,
                 color = if (metadata.hasData) TrophyGold.copy(alpha = 0.6f) else BorderColor.copy(alpha = 0.4f),

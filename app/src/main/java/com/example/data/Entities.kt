@@ -113,6 +113,8 @@ data class ClubEntity(
 data class PlayerEntity(
     @PrimaryKey val id: Int = 1,
     val name: String,
+    var firstName: String = "",
+    var lastName: String = "",
     var age: Int,
     val birthCountry: String,
     val academyCountry: String,
@@ -139,6 +141,7 @@ data class PlayerEntity(
     val generation: Int = 1,
     var peakOvr: Int,
     var potentialCeiling: Int = 99,
+    var revealedPotentialCeiling: Boolean = false,
     var fatigue: Int = 0,
     var overtrainingRisk: Int = 0,
     var hasTrainedThisMonth: Int = 0,
@@ -181,7 +184,13 @@ data class PlayerEntity(
     var isGodMode: Boolean = false,
     var lastGoalMilestonePosted: Int = 0,
     var faceDescriptor: String = ""
-)
+) {
+    val professionalName: String
+        get() = if (lastName.isNotBlank()) lastName else name.split(" ").lastOrNull() ?: name
+
+    val personalName: String
+        get() = if (firstName.isNotBlank()) firstName else name.split(" ").firstOrNull() ?: name
+}
 
 @Entity(tableName = "standings", indices = [Index(value = ["country"])])
 data class StandingEntity(
@@ -302,7 +311,8 @@ data class GameStateEntity(
     var persistedYouthOffers: String? = null,
     var persistedSeniorYouthOffers: String? = null,
     var youthCareerEnded: Boolean = false,
-    var recentChoiceEventIds: String = ""
+    var recentChoiceEventIds: String = "",
+    var pendingSeasonSummaryJson: String? = null
 )
 
 @Entity(tableName = "used_names", indices = [Index(value = ["name"], unique = true)])
@@ -400,7 +410,75 @@ data class SeasonSummaryData(
     val averageRating: Float,
     val trophiesWon: List<String>,
     val playerOfTheSeasonAward: PlayerOfTheSeasonAward
-)
+) {
+    fun serialize(): String {
+        val obj = org.json.JSONObject()
+        obj.put("seasonNumber", seasonNumber)
+        obj.put("playerName", playerName)
+        obj.put("generation", generation)
+        obj.put("clubName", clubName)
+        obj.put("matchesPlayed", matchesPlayed)
+        obj.put("goals", goals)
+        obj.put("assists", assists)
+        obj.put("averageRating", averageRating.toDouble())
+        val trophiesArr = org.json.JSONArray()
+        trophiesWon.forEach { trophiesArr.put(it) }
+        obj.put("trophiesWon", trophiesArr)
+        val awardObj = org.json.JSONObject().apply {
+            put("isWinner", playerOfTheSeasonAward.isWinner)
+            put("awardTitle", playerOfTheSeasonAward.awardTitle)
+            put("totalPoints", playerOfTheSeasonAward.totalPoints)
+            put("goalsPoints", playerOfTheSeasonAward.goalsPoints)
+            put("assistsPoints", playerOfTheSeasonAward.assistsPoints)
+            put("trophiesPoints", playerOfTheSeasonAward.trophiesPoints)
+            put("ratingPoints", playerOfTheSeasonAward.ratingPoints)
+            put("rank", playerOfTheSeasonAward.rank)
+        }
+        obj.put("playerOfTheSeasonAward", awardObj)
+        return obj.toString()
+    }
+
+    companion object {
+        fun deserialize(jsonStr: String): SeasonSummaryData? {
+            if (jsonStr.isBlank()) return null
+            return try {
+                val obj = org.json.JSONObject(jsonStr)
+                val trophiesArr = obj.optJSONArray("trophiesWon")
+                val trophies = mutableListOf<String>()
+                if (trophiesArr != null) {
+                    for (i in 0 until trophiesArr.length()) {
+                        trophies.add(trophiesArr.getString(i))
+                    }
+                }
+                val awardObj = obj.getJSONObject("playerOfTheSeasonAward")
+                val award = PlayerOfTheSeasonAward(
+                    isWinner = awardObj.getBoolean("isWinner"),
+                    awardTitle = awardObj.getString("awardTitle"),
+                    totalPoints = awardObj.getInt("totalPoints"),
+                    goalsPoints = awardObj.getInt("goalsPoints"),
+                    assistsPoints = awardObj.getInt("assistsPoints"),
+                    trophiesPoints = awardObj.getInt("trophiesPoints"),
+                    ratingPoints = awardObj.getInt("ratingPoints"),
+                    rank = awardObj.getInt("rank")
+                )
+                SeasonSummaryData(
+                    seasonNumber = obj.getInt("seasonNumber"),
+                    playerName = obj.getString("playerName"),
+                    generation = obj.getInt("generation"),
+                    clubName = obj.getString("clubName"),
+                    matchesPlayed = obj.getInt("matchesPlayed"),
+                    goals = obj.getInt("goals"),
+                    assists = obj.getInt("assists"),
+                    averageRating = obj.getDouble("averageRating").toFloat(),
+                    trophiesWon = trophies,
+                    playerOfTheSeasonAward = award
+                )
+            } catch (e: Exception) {
+                null
+            }
+        }
+    }
+}
 
 @Entity(tableName = "social_posts", indices = [Index(value = ["sequenceIndex"])])
 data class SocialPostEntity(
@@ -433,7 +511,12 @@ data class SocialPostEntity(
     val reply3MoraleMod: Int = 0,
     val reply3FanRepMod: Int = 0,
     val reply3ManagerTrustMod: Int = 0,
-    val reply3RivalRelMod: Int = 0
-)
+    val reply3RivalRelMod: Int = 0,
+    val replyableUntilSequenceIndex: Int? = if (isReplyable) sequenceIndex + 15 else null
+) {
+    fun isReplyExpired(currentMaxSeq: Int): Boolean {
+        return isReplyable && replyableUntilSequenceIndex != null && currentMaxSeq > replyableUntilSequenceIndex
+    }
+}
 
 

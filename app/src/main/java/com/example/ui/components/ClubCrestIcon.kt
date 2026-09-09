@@ -95,7 +95,6 @@ fun ClubCrestIcon(
     modifier: Modifier = Modifier,
     size: Dp = 40.dp
 ) {
-    val textMeasurer = rememberTextMeasurer()
     val rng = remember(clubId) { Random(clubId) }
     val (base, secondary, trim) = remember(clubId, clubName) {
         val forcedIndex = colorTokenPaletteIndex(clubName)
@@ -104,13 +103,6 @@ fun ClubCrestIcon(
     val shape = remember(clubId) { CrestShape.entries[rng.nextInt(CrestShape.entries.size)] }
     val pattern = remember(clubId) { CrestPattern.entries[rng.nextInt(CrestPattern.entries.size)] }
     val emblem = remember(clubId) { CrestEmblem.entries[rng.nextInt(CrestEmblem.entries.size)] }
-    val initials = remember(clubName) {
-        clubName.trim().split(" ").filter { it.isNotBlank() }
-            .let { words ->
-                if (words.size >= 2) "${words[0].first()}${words[1].first()}"
-                else clubName.take(2)
-            }.uppercase()
-    }
 
     Canvas(modifier = modifier.size(size)) {
         val w = this.size.width
@@ -247,29 +239,6 @@ fun ClubCrestIcon(
                     size = Size(r * 2f, r * 1.3f),
                     style = Stroke(width = w * 0.08f, cap = StrokeCap.Round)
                 )
-        }
-
-        // Initials text drawn directly onto the same Canvas, clipped to crest outline
-        if (initials.isNotBlank()) {
-            clipPath(outline) {
-                val initialsFontSize = (h * 0.22f).sp
-                val textLayoutResult = textMeasurer.measure(
-                    text = initials,
-                    style = TextStyle(
-                        color = trim,
-                        fontSize = initialsFontSize,
-                        fontWeight = FontWeight.Bold,
-                        textAlign = TextAlign.Center
-                    )
-                )
-                val initialsCx = w / 2f
-                val initialsCy = h * 0.72f
-                val textOffset = Offset(
-                    x = initialsCx - textLayoutResult.size.width / 2f,
-                    y = initialsCy - textLayoutResult.size.height / 2f
-                )
-                drawText(textLayoutResult, topLeft = textOffset)
-            }
         }
     }
 }

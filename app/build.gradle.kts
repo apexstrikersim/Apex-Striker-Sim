@@ -13,8 +13,8 @@ android {
     applicationId = "com.apexstrikersim.career"
     minSdk = 24
     targetSdk = 36
-    versionCode = 27
-    versionName = "27" // Keep in sync with AppVersion.CURRENT in AppVersion.kt and AppDatabase's @Database(version=...)
+    versionCode = 28
+    versionName = "28" // Keep in sync with AppVersion.CURRENT in AppVersion.kt and AppDatabase's @Database(version=...)
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }

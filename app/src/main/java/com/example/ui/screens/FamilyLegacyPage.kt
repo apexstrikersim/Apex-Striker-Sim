@@ -755,8 +755,8 @@ private fun OvrProgressionCanvas(
 
                 val paddingLeft = 46.dp.toPx()
                 val paddingRight = 20.dp.toPx()
-                val paddingTop = 28.dp.toPx()
-                val paddingBottom = 32.dp.toPx()
+                val paddingTop = 32.dp.toPx()
+                val paddingBottom = 34.dp.toPx()
 
                 val chartWidth = width - paddingLeft - paddingRight
                 val chartHeight = height - paddingTop - paddingBottom
@@ -783,7 +783,7 @@ private fun OvrProgressionCanvas(
                         textLayoutResult = textLayout,
                         topLeft = Offset(
                             x = paddingLeft - textLayout.size.width - 6.dp.toPx(),
-                            y = y - textLayout.size.height / 2f
+                            y = (y - textLayout.size.height / 2f).coerceIn(2.dp.toPx(), height - textLayout.size.height - 2.dp.toPx())
                         )
                     )
                 }
@@ -802,7 +802,8 @@ private fun OvrProgressionCanvas(
                     } else {
                         paddingLeft + (index.toFloat() / (displayRecords.size - 1)) * chartWidth
                     }
-                    val yRatio = (rec.ovrAtSeasonEnd - minOvr).toFloat() / (maxOvr - minOvr).coerceAtLeast(1)
+                    val rawRatio = (rec.ovrAtSeasonEnd - minOvr).toFloat() / (maxOvr - minOvr).coerceAtLeast(1)
+                    val yRatio = rawRatio.coerceIn(0f, 1f)
                     val y = paddingTop + chartHeight * (1f - yRatio)
                     Offset(x, y)
                 }
@@ -884,11 +885,12 @@ private fun OvrProgressionCanvas(
                             paddingLeft,
                             (width - paddingRight - ovrTextLayout.size.width).coerceAtLeast(paddingLeft)
                         )
+                        val ovrY = (pt.y - ovrTextLayout.size.height - 4.dp.toPx()).coerceAtLeast(2.dp.toPx())
                         drawText(
                             textLayoutResult = ovrTextLayout,
                             topLeft = Offset(
                                 x = ovrX,
-                                y = pt.y - ovrTextLayout.size.height - 4.dp.toPx()
+                                y = ovrY
                             )
                         )
                     }
@@ -910,11 +912,12 @@ private fun OvrProgressionCanvas(
                         )
 
                         if (ageX >= lastAgeLabelRight + 6.dp.toPx() || isFirst) {
+                            val ageY = (paddingTop + chartHeight + 8.dp.toPx()).coerceAtMost(height - ageTextLayout.size.height - 2.dp.toPx())
                             drawText(
                                 textLayoutResult = ageTextLayout,
                                 topLeft = Offset(
                                     x = ageX,
-                                    y = paddingTop + chartHeight + 8.dp.toPx()
+                                    y = ageY
                                 )
                             )
                             lastAgeLabelRight = ageX + textWidth

@@ -289,7 +289,7 @@ fun ClubTab(viewModel: CareerViewModel, player: PlayerEntity, club: ClubEntity?)
                         // My OVR
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Text(text = "YOU", fontSize = 12.sp, color = TextSecondary, fontWeight = FontWeight.Bold)
-                            Text(text = player.name.split(" ").lastOrNull() ?: player.name, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                            Text(text = player.professionalName, fontSize = 14.sp, fontWeight = FontWeight.Bold)
                             Spacer(modifier = Modifier.height(6.dp))
                             Box(
                                 modifier = Modifier

@@ -107,6 +107,7 @@ class CareerViewModel(application: Application) : AndroidViewModel(application) 
         currentJob = viewModelScope.launch {
             repository.onTrophyUnlockedListener = { trophy -> triggerTrophyAnimation(trophy) }
             repository.migrateClubRecordsIfNeeded()
+            repository.restorePendingSeasonSummaryIfNeeded()
             launch { repository.playerFlow.collect { _playerFlow.value = it; syncSlotMetadata() } }
             launch { repository.allClubsFlow.collect { _clubsFlow.value = it } }
             launch { repository.gameStateFlow.collect { _gameStateFlow.value = it } }
@@ -242,6 +243,18 @@ class CareerViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
+    fun deleteSaveSlot(slotId: Int) {
+        saveSlotManager.clearSlot(slotId, getApplication())
+        val last = saveSlotManager.getLastActiveSlot()
+        _hasActiveSave.value = last != 0 && saveSlotManager.getSlotMetadata(last).hasData
+        if (_activeSlotId.value == slotId) {
+            viewModelScope.launch {
+                repository.clearAllData()
+                syncSlotMetadata()
+            }
+        }
+    }
+
     fun returnToMainMenu() {
         _isShowingSettingsDialog.value = false
         _activeScreen.value = Screen.MAIN_MENU
@@ -276,7 +289,9 @@ class CareerViewModel(application: Application) : AndroidViewModel(application) 
     )
 
     fun clearSeasonSummary() {
-        repository.clearSeasonSummary()
+        viewModelScope.launch {
+            repository.clearSeasonSummary()
+        }
     }
 
     // UI Local state flows
@@ -444,27 +459,27 @@ class CareerViewModel(application: Application) : AndroidViewModel(application) 
             // Check bonus integer levels
             if (player.finishingTrainingBonus >= 1.0f) {
                 val inc = player.finishingTrainingBonus.toInt()
-                player.finishing = (player.finishing + inc).coerceIn(1, player.potentialCeiling)
+                player.finishing = (player.finishing + inc).coerceIn(1, 99)
                 player.finishingTrainingBonus -= inc
             }
             if (player.passingTrainingBonus >= 1.0f) {
                 val inc = player.passingTrainingBonus.toInt()
-                player.passing = (player.passing + inc).coerceIn(1, player.potentialCeiling)
+                player.passing = (player.passing + inc).coerceIn(1, 99)
                 player.passingTrainingBonus -= inc
             }
             if (player.paceTrainingBonus >= 1.0f) {
                 val inc = player.paceTrainingBonus.toInt()
-                player.pace = (player.pace + inc).coerceIn(1, player.potentialCeiling)
+                player.pace = (player.pace + inc).coerceIn(1, 99)
                 player.paceTrainingBonus -= inc
             }
             if (player.techniqueTrainingBonus >= 1.0f) {
                 val inc = player.techniqueTrainingBonus.toInt()
-                player.technique = (player.technique + inc).coerceIn(1, player.potentialCeiling)
+                player.technique = (player.technique + inc).coerceIn(1, 99)
                 player.techniqueTrainingBonus -= inc
             }
             if (player.physicalTrainingBonus >= 1.0f) {
                 val inc = player.physicalTrainingBonus.toInt()
-                player.physical = (player.physical + inc).coerceIn(1, player.potentialCeiling)
+                player.physical = (player.physical + inc).coerceIn(1, 99)
                 player.physicalTrainingBonus -= inc
             }
             player.ovr = repository.calculateOvr(player.finishing, player.pace, player.passing, player.physical, player.technique).coerceAtMost(player.potentialCeiling)
@@ -546,7 +561,9 @@ class CareerViewModel(application: Application) : AndroidViewModel(application) 
         preferredFoot: String = "Right",
         squadNumber: Int = 9,
         backgroundStory: String = "Street Cages",
-        faceDescriptor: String = ""
+        faceDescriptor: String = "",
+        firstName: String = "",
+        lastName: String = ""
     ) {
         viewModelScope.launch {
             _activeMatch.value = null
@@ -559,7 +576,9 @@ class CareerViewModel(application: Application) : AndroidViewModel(application) 
                 preferredFoot = preferredFoot,
                 squadNumber = squadNumber,
                 backgroundStory = backgroundStory,
-                faceDescriptor = faceDescriptor
+                faceDescriptor = faceDescriptor,
+                firstName = firstName,
+                lastName = lastName
             )
             _selectedStandingCountry.value = academy
             _activeScreen.value = Screen.GAMEPLAY
@@ -569,7 +588,7 @@ class CareerViewModel(application: Application) : AndroidViewModel(application) 
     /**
      * Start son's career after retirement
      */
-    fun createSon(sonName: String) {
+    fun createSon(sonName: String, firstName: String = "", lastName: String = "") {
         val father = playerFlow.value ?: return
         viewModelScope.launch {
             _activeMatch.value = null
@@ -586,7 +605,9 @@ class CareerViewModel(application: Application) : AndroidViewModel(application) 
                 fatherFinalOvr = father.ovr,
                 fatherTrophiesWeight = weight,
                 fatherPotentialCeiling = father.potentialCeiling,
-                fatherFaceDescriptor = father.faceDescriptor
+                fatherFaceDescriptor = father.faceDescriptor,
+                firstName = firstName,
+                lastName = lastName
             )
             _selectedStandingCountry.value = father.academyCountry
             _activeScreen.value = Screen.GAMEPLAY

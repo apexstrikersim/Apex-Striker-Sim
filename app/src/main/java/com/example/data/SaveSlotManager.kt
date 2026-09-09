@@ -53,7 +53,7 @@ class SaveSlotManager(context: Context) {
             .apply()
     }
 
-    fun clearSlot(slotId: Int) {
+    fun clearSlot(slotId: Int, context: Context? = null) {
         prefs.edit()
             .remove("slot_${slotId}_has_data")
             .remove("slot_${slotId}_name")
@@ -62,6 +62,11 @@ class SaveSlotManager(context: Context) {
             .remove("slot_${slotId}_club")
             .remove("slot_${slotId}_timestamp")
             .apply()
+        try {
+            context?.deleteDatabase("apex_career_slot_$slotId.db")
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
     }
 
     fun migrateLegacyDatabaseIfNeeded(context: Context) {

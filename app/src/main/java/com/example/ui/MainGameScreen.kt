@@ -1,12 +1,19 @@
 package com.example.ui
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -24,6 +31,7 @@ fun MainGameScreen(viewModel: CareerViewModel) {
     val screen by viewModel.activeScreen.collectAsStateWithLifecycle()
     val selectedTab by viewModel.selectedTab.collectAsStateWithLifecycle()
     val isSimulatingSeason by viewModel.isSimulatingSeason.collectAsStateWithLifecycle()
+    val isAdvancing by viewModel.isAdvancing.collectAsStateWithLifecycle()
 
     Box(
         modifier = Modifier
@@ -39,6 +47,46 @@ fun MainGameScreen(viewModel: CareerViewModel) {
             Screen.SON_SETUP -> SonSetupScreen(viewModel, player)
             Screen.MATCH_SCREEN -> MatchScreen(viewModel)
             Screen.YOUTH_CAREER_ENDED -> YouthCareerEndedScreen(viewModel, player)
+        }
+
+        // Smooth semi-transparent overlay during month advancement / back-to-back match sequence
+        AnimatedVisibility(
+            visible = isAdvancing && !isSimulatingSeason,
+            enter = fadeIn(),
+            exit = fadeOut()
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.65f))
+                    .clickable(enabled = true, onClick = {}),
+                contentAlignment = Alignment.Center
+            ) {
+                Surface(
+                    shape = RoundedCornerShape(16.dp),
+                    color = DarkSlate,
+                    border = androidx.compose.foundation.BorderStroke(1.dp, BorderColor),
+                    shadowElevation = 8.dp
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(14.dp)
+                    ) {
+                        CircularProgressIndicator(
+                            color = PitchGreen,
+                            strokeWidth = 3.dp,
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Text(
+                            text = "Simulating matchday...",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = TextPrimary
+                        )
+                    }
+                }
+            }
         }
 
         if (isSimulatingSeason) {
@@ -95,6 +143,9 @@ fun MainGameScreen(viewModel: CareerViewModel) {
                 saveSlotManager = viewModel.saveSlotManager,
                 onSlotSelected = { slotId ->
                     viewModel.onSlotSelectedFromPicker(slotId)
+                },
+                onDeleteSlot = { slotId ->
+                    viewModel.deleteSaveSlot(slotId)
                 },
                 onDismiss = {
                     viewModel.dismissSaveSlotPicker()

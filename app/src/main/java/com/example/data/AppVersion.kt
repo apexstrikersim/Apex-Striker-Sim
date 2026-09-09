@@ -6,5 +6,5 @@ package com.example.data
  * Bump this at the same time you bump the Room schema version — do not let them drift again.
  */
 object AppVersion {
-    const val CURRENT = 27
+    const val CURRENT = 28
 }

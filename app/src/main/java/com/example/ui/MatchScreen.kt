@@ -1112,12 +1112,34 @@ fun LiveMatchSimulation(
             if (isDefensiveScenario) {
                 matchRatingDelta -= 0.6f
                 if (isPlayerHome) runningAwayScore++ else runningHomeScore++
-                choiceResolutionResult = "TIMEOUT! You failed to react in time. The opponent exploited your indecision and scored!"
+                choiceResolutionResult = when (moment.type) {
+                    MomentType.LATE_DEFENSIVE -> "TIMEOUT! You froze on the back line as the cross came in. The attacker darted past your shoulder and tapped it into the net!"
+                    MomentType.DEFENSIVE_TRANSITION -> "TIMEOUT! Caught in two minds on the counter! The winger exploited the channel you failed to track and smashed it home!"
+                    MomentType.PRESSING_TRIGGER -> "TIMEOUT! Indecision in the press! You hesitated to step up, allowing the playmaker space to pick out a lethal strike!"
+                    MomentType.SET_PIECE_DEFENSE -> "TIMEOUT! You stood flat-footed in the box on the corner delivery! Their center-back leapt uncontested to power a header home!"
+                    MomentType.GOAL_KICK_PRESSURE -> "TIMEOUT! You dallied reading the long goal kick! The opponent won the second ball and punished the defense with a goal!"
+                    else -> "TIMEOUT! You failed to react in time. The opponent exploited your indecision and scored!"
+                }
             } else {
                 opportunitiesMissed++
                 possessionLostCount++
                 matchRatingDelta -= 0.4f
-                choiceResolutionResult = "TIMEOUT! You hesitated too long and lost the opportunity."
+                choiceResolutionResult = when (moment.type) {
+                    MomentType.KEEPER_1V1 -> "TIMEOUT! You took too many touches and the charging goalkeeper snatched the ball right off your boots!"
+                    MomentType.THROUGH_BALL -> "TIMEOUT! You hesitated on the through pass; the offside flag went up while the defense cleared!"
+                    MomentType.PENALTY -> "TIMEOUT! Whistle blown for delay! You rushed an awkward, scuffed strike straight into the keeper's gloves!"
+                    MomentType.CROSS_FROM_WING -> "TIMEOUT! Couldn't decide between header or volley; the cross flew harmlessly out for a throw-in!"
+                    MomentType.COUNTER_ATTACK -> "TIMEOUT! You held onto the ball far too long on the break; recovery defenders swarmed back and tackled you from behind!"
+                    MomentType.FREE_KICK_OPPORTUNITY -> "TIMEOUT! Second-guessed your run-up and struck the ball weakly straight into the defensive wall!"
+                    MomentType.ONE_ON_ONE_BREAKS -> "TIMEOUT! Trapped in two minds whether to shoot or round the defender; you were dispossessed before getting a shot away!"
+                    MomentType.REBOUND_OPPORTUNITY -> "TIMEOUT! Spilled ball was right at your feet, but you hesitated and a sliding defender hooked it away to safety!"
+                    MomentType.CORNER_KICK -> "TIMEOUT! You mistimed your jump entirely; the delivery sailed over your head into the keeper's waiting arms!"
+                    MomentType.BUILDUP_PLAY -> "TIMEOUT! Lingered on the ball looking for options; midfield pressure closed down your angle and forced a turnover!"
+                    MomentType.DETAILED_CROSS -> "TIMEOUT! Hesitated to swing your boot; the fullback blocked the delivery and ushered it out for a goal kick!"
+                    MomentType.FINAL_MINUTE_PRESSURE -> "TIMEOUT! Time ticked away while you hesitated! The referee blew the final whistle as the defense hacked it clear!"
+                    MomentType.DEFENSIVE_PRESSURE -> "TIMEOUT! Caught dwelling on the ball deep in your own half; they stripped possession and forced a desperate clearance!"
+                    else -> "TIMEOUT! You hesitated too long and lost the opportunity."
+                }
             }
             commentaryLogs.add(
                 LiveCommentary(moment.minute, choiceResolutionResult ?: "", isGoal = isDefensiveScenario, isImportant = true)

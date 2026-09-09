@@ -155,7 +155,7 @@ fun MainMenuScreen(viewModel: CareerViewModel) {
                         .height(52.dp)
                         .bounceClick()
                 ) {
-                    Text("LOAD GAME", fontWeight = FontWeight.Bold, fontSize = 15.sp, letterSpacing = 1.sp)
+                    Text("SAVES", fontWeight = FontWeight.Bold, fontSize = 15.sp, letterSpacing = 1.sp)
                 }
             }
 

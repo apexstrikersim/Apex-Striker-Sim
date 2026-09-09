@@ -282,15 +282,6 @@ fun GameplayScreen(
         }
     }
 
-    // Dialogs
-    if (isShowingYouthTraining) {
-        YouthTrainingDialog(
-            player = player,
-            onCompleteTraining = { drill, quality -> viewModel.completeYouthTraining(drill, quality) },
-            onDismiss = { viewModel.closeYouthTrainingDialog() }
-        )
-    }
-
     val scoutOfferMessage by viewModel.scoutOfferMessage.collectAsStateWithLifecycle()
     LaunchedEffect(scoutOfferMessage) {
         scoutOfferMessage?.let { msg ->
@@ -305,50 +296,57 @@ fun GameplayScreen(
         }
     }
 
-    if (isShowingYouthScout && scoutOffers.isNotEmpty()) {
-        YouthScoutOfferDialog(
-            offers = scoutOffers,
-            onAccept = { offer -> viewModel.acceptYouthScoutOffer(offer) },
-            onReject = { offer -> viewModel.rejectYouthScoutOffer(offer) },
-            onDeclineAll = { viewModel.declineAllYouthScoutOffers() },
-            onDismiss = { viewModel.closeYouthScoutDialog() }
-        )
-    }
-
-    if (isShowingSeniorYouthScout && seniorYouthOffers.isNotEmpty()) {
-        SeniorScoutOfferDialog(
-            offers = seniorYouthOffers,
-            onAccept = { offer -> viewModel.acceptSeniorYouthOffer(offer) },
-            onReject = { offer -> viewModel.rejectSeniorYouthOffer(offer) },
-            onDeclineAll = { viewModel.declineAllSeniorYouthOffers() },
-            onDismiss = { viewModel.closeSeniorYouthScoutDialog() }
-        )
-    }
-
-    // Dialogs
-    if (selectedClubIdForProfile != null && selectedClubForProfile != null) {
-        ClubProfileDialog(
-            club = selectedClubForProfile!!,
-            history = selectedClubHistory,
-            trophies = selectedClubTrophies,
-            records = selectedClubRecords,
-            viewModel = viewModel,
-            onDismiss = { viewModel.selectClubForProfile(null) }
-        )
-    }
-    if (isShowingTransfer) {
-        TransferOffersDialog(viewModel)
-    }
-    if (isShowingSettings && !isSimulatingSeason) {
-        SettingsDialog(viewModel, gameState)
-    }
-    if (gameState.activeChoicePrompt != null && !isSimulatingSeason) {
-        ChoiceEventDialog(viewModel, gameState)
-    }
-    if (latestSeasonSummary != null && !isSimulatingSeason) {
-        SeasonSummaryDialog(
-            summary = latestSeasonSummary!!,
-            onDismiss = { viewModel.clearSeasonSummary() }
-        )
+    // Dialog Queue: Render dialogs sequentially with clean priority so only one displays at any time
+    when {
+        isShowingSettings && !isSimulatingSeason -> {
+            SettingsDialog(viewModel, gameState)
+        }
+        selectedClubIdForProfile != null && selectedClubForProfile != null -> {
+            ClubProfileDialog(
+                club = selectedClubForProfile!!,
+                history = selectedClubHistory,
+                trophies = selectedClubTrophies,
+                records = selectedClubRecords,
+                viewModel = viewModel,
+                onDismiss = { viewModel.selectClubForProfile(null) }
+            )
+        }
+        isShowingYouthTraining -> {
+            YouthTrainingDialog(
+                player = player,
+                onCompleteTraining = { drill, quality -> viewModel.completeYouthTraining(drill, quality) },
+                onDismiss = { viewModel.closeYouthTrainingDialog() }
+            )
+        }
+        latestSeasonSummary != null && !isSimulatingSeason -> {
+            SeasonSummaryDialog(
+                summary = latestSeasonSummary!!,
+                onDismiss = { viewModel.clearSeasonSummary() }
+            )
+        }
+        gameState.activeChoicePrompt != null && !isSimulatingSeason -> {
+            ChoiceEventDialog(viewModel, gameState)
+        }
+        isShowingYouthScout && scoutOffers.isNotEmpty() -> {
+            YouthScoutOfferDialog(
+                offers = scoutOffers,
+                onAccept = { offer -> viewModel.acceptYouthScoutOffer(offer) },
+                onReject = { offer -> viewModel.rejectYouthScoutOffer(offer) },
+                onDeclineAll = { viewModel.declineAllYouthScoutOffers() },
+                onDismiss = { viewModel.closeYouthScoutDialog() }
+            )
+        }
+        isShowingSeniorYouthScout && seniorYouthOffers.isNotEmpty() -> {
+            SeniorScoutOfferDialog(
+                offers = seniorYouthOffers,
+                onAccept = { offer -> viewModel.acceptSeniorYouthOffer(offer) },
+                onReject = { offer -> viewModel.rejectSeniorYouthOffer(offer) },
+                onDeclineAll = { viewModel.declineAllSeniorYouthOffers() },
+                onDismiss = { viewModel.closeSeniorYouthScoutDialog() }
+            )
+        }
+        isShowingTransfer -> {
+            TransferOffersDialog(viewModel)
+        }
     }
 }

@@ -1,10 +1,10 @@
 # Apex Striker Career
 
-**v2.4.0** • A single-player, text-driven soccer career simulation built with **Kotlin** and **Jetpack Compose** for Android.
+**v2.8.0** • A single-player, text-driven soccer career simulation built with **Kotlin** and **Jetpack Compose** for Android.
 
 You are a young striker starting in the concrete cages of your hometown and working your way up to European stadiums, trophies, and eventually a **multi-generational football legacy**. There are no real clubs, no live multiplayer, and no microtransactions — just a tight loop of matches, training, transfers, and story.
 
-> **Status:** Early development *(repo created July 2026)*. The README is the source of truth for what the game is and how it works.
+> **Status:** Active development. The README and `PROJECT_STRUCTURE.md` document the architecture, game loops, and UI components.
 
 ---
 
@@ -12,13 +12,12 @@ You are a young striker starting in the concrete cages of your hometown and work
 
 Each turn you **advance a month**. In that month the game auto-simulates every fixture your player is involved in, updates the league tables, and appends a line to your **Career Timeline** log. Between months you can:
 
-- **Manually play** a match (pick score, goals, assists, rating, minutes played) instead of quick-simming it.
-- **Quick-sim** the current match with a single tap.
-- **Train** specific attributes through youth drills.
-- **Buy / sell** your player during transfer windows (months 0, 5, 9).
-- **Browse** the trophy cabinet, league tables, fixtures calendar, and club info.
-
-It's a "manage the career arc" game, not a real-time action game.
+- **Manually play** interactive matches with key moments (1v1s, through balls, penalties, late defensive actions).
+- **Quick-sim** matches with detailed summaries.
+- **Train** specific attributes through youth & senior drills.
+- **Negotiate transfers** with dynamic offers (1–3 clubs) scaled to your form and OVR during transfer windows (months 0, 5, 9).
+- **Track your dynasty** with the multi-generational family tree, best records, and OVR progression charts.
+- **Browse** the trophy cabinet, league tables, fixtures calendar, social media feed, and club profiles.
 
 ---
 
@@ -26,15 +25,14 @@ It's a "manage the career arc" game, not a real-time action game.
 
 - **Three-phase career arc** — Street Football → Youth Academy → Senior Professional.
 - **Five core attributes** drive everything: Finishing, Pace, Passing, Physical, Technique.
-- **OVR that responds to your real stats**, capped at a per-player `potentialCeiling`.
-- **Manual vs. Quick-SIM match play** with goals, assists, match ratings, Man-of-the-Match, and form shifts.
-- **European competitions** — Champions League, Europa League, Conference League, plus domestic league + cups, all with proper group/league and knockout-bracket tracking.
-- **Transfer windows**, squad rotation, bench roles (starter / sub / benched), and manager-trust effects.
-- **Youth development path** with training drills (Shooting, Passing, Pace, Technical, Physical) and scout offers.
-- **Social stats** — morale, fan reputation, manager trust, rival relationship, fatigue, and form.
-- **Multi-generational legacy** — retire, record your legacy, then create and guide your son's career with inherited potential.
-- **Developer mode** for testing: instant stat editing, season simulation, club-rep editing.
-- **Slot-based save system** with Room database per save slot.
+- **Dynamic OVR & Growth** — real stat growth from youth matches, training drills, and senior performance, capped at `potentialCeiling`.
+- **Match Engine & Simulation** — Interactive live matches with real whistle audio (`kick_off`, `half_time`, `full_time`), penalty timing bars, and commentary logs.
+- **European competitions** — Champions League, Europa League, Conference League, domestic leagues + cups with proper knockout brackets.
+- **Dynamic Transfer System** — 1 to 3 offers based on player OVR and current form.
+- **Career Timeline Logs** — Grouped by month/season with category badges (Trophies, Transfers, Matches, Training, Decisions) and search filters.
+- **Procedural Club Crests & Face Icons** — Geometric heraldic crests and customizable player face avatars with mustache/beard styles and form expressions.
+- **Family Legacy & Dynasty** — Multi-generational lineage, OVR progression graph, generation milestones, and inherited potential pools.
+- **Slot-based save system** with Room database per save slot and smooth simulation overlays.
 
 ---
 

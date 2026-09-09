@@ -89,6 +89,8 @@ enum class YouthDrillType {
 @Composable
 fun YouthTrainingDialog(
     player: PlayerEntity,
+    title: String = "YOUTH DEVELOPMENT DRILLS",
+    subtitle: String = "Select Youth Drill",
     onCompleteTraining: (drillType: YouthDrillType, qualityScore: Float) -> Unit,
     onDismiss: () -> Unit
 ) {
@@ -124,7 +126,7 @@ fun YouthTrainingDialog(
                 if (selectedDrill == null) {
                     // Drill Selection Screen
                     Text(
-                        text = "YOUTH DEVELOPMENT DRILLS",
+                        text = title,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
                         color = PitchGreen,
@@ -134,7 +136,7 @@ fun YouthTrainingDialog(
                     Spacer(modifier = Modifier.height(4.dp))
 
                     Text(
-                        text = "Select Youth Drill",
+                        text = subtitle,
                         fontSize = 20.sp,
                         fontWeight = FontWeight.ExtraBold,
                         color = Color.White

@@ -44,7 +44,7 @@ fun SettingsDialog(viewModel: CareerViewModel, gameState: GameStateEntity?) {
     var showPinPrompt by remember { mutableStateOf(false) }
     var pinInput by remember { mutableStateOf("") }
     var pinError by remember { mutableStateOf(false) }
-    var expandedSection by remember { mutableStateOf<String?>(if (gameState?.isDevMode == true) "dev" else null) }
+    var expandedSection by remember { mutableStateOf<String?>(null) }
     var expandedDevPlayerStats by remember { mutableStateOf(false) }
     var expandedDevSocialStats by remember { mutableStateOf(false) }
 

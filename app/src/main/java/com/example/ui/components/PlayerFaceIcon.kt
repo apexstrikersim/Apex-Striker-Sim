@@ -580,80 +580,108 @@ fun PlayerFaceIcon(
         if (canRenderBeard) {
             when (descriptor.beardStyle.coerceIn(0, 3)) {
                 0 -> {
-                    // Styled Mustache (Clean horizontal mustache bar with angled wings above mouth)
+                    // Refined Chevron / Tapered Mustache (natural curve sitting above upper lip)
                     val stacheW = headWidth * 0.38f
-                    val stacheH = h * 0.055f
-                    val stacheY = mouthY - stacheH - h * 0.012f
                     val stachePath = Path().apply {
-                        moveTo(cx - stacheW / 2f, stacheY + stacheH * 0.8f)
-                        lineTo(cx - stacheW * 0.35f, stacheY)
-                        lineTo(cx, stacheY + stacheH * 0.3f)
-                        lineTo(cx + stacheW * 0.35f, stacheY)
-                        lineTo(cx + stacheW / 2f, stacheY + stacheH * 0.8f)
-                        lineTo(cx + stacheW * 0.35f, stacheY + stacheH)
-                        lineTo(cx, stacheY + stacheH * 0.5f)
-                        lineTo(cx - stacheW * 0.35f, stacheY + stacheH)
+                        moveTo(cx - stacheW / 2f, mouthY - h * 0.010f)
+                        cubicTo(
+                            cx - stacheW * 0.28f, mouthY - h * 0.055f,
+                            cx - stacheW * 0.08f, mouthY - h * 0.048f,
+                            cx, mouthY - h * 0.032f
+                        )
+                        cubicTo(
+                            cx + stacheW * 0.08f, mouthY - h * 0.048f,
+                            cx + stacheW * 0.28f, mouthY - h * 0.055f,
+                            cx + stacheW / 2f, mouthY - h * 0.010f
+                        )
+                        cubicTo(
+                            cx + stacheW * 0.25f, mouthY - h * 0.018f,
+                            cx + stacheW * 0.08f, mouthY - h * 0.015f,
+                            cx, mouthY - h * 0.012f
+                        )
+                        cubicTo(
+                            cx - stacheW * 0.08f, mouthY - h * 0.015f,
+                            cx - stacheW * 0.25f, mouthY - h * 0.018f,
+                            cx - stacheW / 2f, mouthY - h * 0.010f
+                        )
                         close()
                     }
                     drawPath(stachePath, color = hairColor)
                 }
                 1 -> {
-                    // Goatee / Trimmed Beard + Mustache
-                    // 1. Mustache
+                    // Refined Goatee + Soul Patch + Mustache
                     val stacheW = headWidth * 0.36f
-                    val stacheH = h * 0.045f
-                    val stacheY = mouthY - stacheH - h * 0.012f
-                    drawRoundRect(
-                        color = hairColor,
-                        topLeft = Offset(cx - stacheW / 2f, stacheY),
-                        size = Size(stacheW, stacheH),
-                        cornerRadius = CornerRadius(2f, 2f)
-                    )
-                    // 2. Chin Beard
-                    val chinBeardW = headWidth * 0.44f
-                    val chinBeardTop = mouthY + h * 0.035f
-                    val chinBeardH = (headTop + headHeight) - chinBeardTop
-                    drawRoundRect(
-                        color = hairColor,
-                        topLeft = Offset(cx - chinBeardW / 2f, chinBeardTop),
-                        size = Size(chinBeardW, chinBeardH),
-                        cornerRadius = CornerRadius(chinBeardW * 0.4f, chinBeardW * 0.4f)
-                    )
+                    val stachePath = Path().apply {
+                        moveTo(cx - stacheW / 2f, mouthY - h * 0.010f)
+                        cubicTo(cx - stacheW * 0.25f, mouthY - h * 0.045f, cx - stacheW * 0.08f, mouthY - h * 0.040f, cx, mouthY - h * 0.028f)
+                        cubicTo(cx + stacheW * 0.08f, mouthY - h * 0.040f, cx + stacheW * 0.25f, mouthY - h * 0.045f, cx + stacheW / 2f, mouthY - h * 0.010f)
+                        cubicTo(cx + stacheW * 0.25f, mouthY - h * 0.016f, cx + stacheW * 0.08f, mouthY - h * 0.014f, cx, mouthY - h * 0.010f)
+                        cubicTo(cx - stacheW * 0.08f, mouthY - h * 0.014f, cx - stacheW * 0.25f, mouthY - h * 0.016f, cx - stacheW / 2f, mouthY - h * 0.010f)
+                        close()
+                    }
+                    drawPath(stachePath, color = hairColor)
+
+                    // Chin goatee with smooth tapered chin curve
+                    val chinW = headWidth * 0.36f
+                    val chinTop = mouthY + h * 0.038f
+                    val chinPath = Path().apply {
+                        moveTo(cx - chinW / 2f, chinTop)
+                        quadraticTo(cx - chinW * 0.45f, headTop + headHeight, cx, headTop + headHeight + 1f)
+                        quadraticTo(cx + chinW * 0.45f, headTop + headHeight, cx + chinW / 2f, chinTop)
+                        quadraticTo(cx, chinTop + h * 0.02f, cx - chinW / 2f, chinTop)
+                        close()
+                    }
+                    drawPath(chinPath, color = hairColor)
+
+                    // Soul patch under lip
+                    val soulPatchPath = Path().apply {
+                        moveTo(cx - 2.5f, mouthY + h * 0.016f)
+                        lineTo(cx + 2.5f, mouthY + h * 0.016f)
+                        lineTo(cx, mouthY + h * 0.034f)
+                        close()
+                    }
+                    drawPath(soulPatchPath, color = hairColor)
                 }
                 2 -> {
-                    // Full Boxed Beard + Mustache
+                    // Refined Full Beard with natural jawline contour and framed mouth
                     val fullBeardPath = Path().apply {
-                        moveTo(headLeft + 1f, headTop + headHeight * 0.48f)
-                        lineTo(headLeft + headWidth * 0.22f, mouthY - h * 0.03f)
-                        lineTo(cx, mouthY - h * 0.015f)
-                        lineTo(headLeft + headWidth * 0.78f, mouthY - h * 0.03f)
-                        lineTo(headLeft + headWidth - 1f, headTop + headHeight * 0.48f)
-                        lineTo(headLeft + headWidth - 1f, headTop + headHeight * 0.85f)
-                        quadraticTo(cx, headTop + headHeight + 2f, headLeft + 1f, headTop + headHeight * 0.85f)
+                        // Outer jawline contour
+                        moveTo(headLeft + 1.5f, headTop + headHeight * 0.48f)
+                        lineTo(headLeft + 1.5f, headTop + headHeight * 0.82f)
+                        quadraticTo(cx, headTop + headHeight + 2.5f, headLeft + headWidth - 1.5f, headTop + headHeight * 0.82f)
+                        lineTo(headLeft + headWidth - 1.5f, headTop + headHeight * 0.48f)
+                        // Inner cheek & mustache line
+                        lineTo(headLeft + headWidth * 0.76f, mouthY - h * 0.035f)
+                        quadraticTo(cx, mouthY - h * 0.020f, headLeft + headWidth * 0.24f, mouthY - h * 0.035f)
                         close()
                     }
                     drawPath(fullBeardPath, color = hairColor)
-                    // Cut out small mouth slot area in skin tone so mouth remains visible
-                    drawRoundRect(
-                        color = skinTone,
-                        topLeft = Offset(cx - mouthW * 0.65f, mouthY - h * 0.02f),
-                        size = Size(mouthW * 1.3f, h * 0.07f),
-                        cornerRadius = CornerRadius(3f, 3f)
-                    )
+
+                    // Organic mouth cutout in skin tone so mouth expression remains clearly readable
+                    val cutoutPath = Path().apply {
+                        val cutoutW = mouthW * 1.35f
+                        val cutoutH = h * 0.080f
+                        moveTo(cx - cutoutW / 2f, mouthY - cutoutH * 0.25f)
+                        quadraticTo(cx, mouthY - cutoutH * 0.45f, cx + cutoutW / 2f, mouthY - cutoutH * 0.25f)
+                        quadraticTo(cx + cutoutW * 0.45f, mouthY + cutoutH * 0.65f, cx, mouthY + cutoutH * 0.65f)
+                        quadraticTo(cx - cutoutW * 0.45f, mouthY + cutoutH * 0.65f, cx - cutoutW / 2f, mouthY - cutoutH * 0.25f)
+                        close()
+                    }
+                    drawPath(cutoutPath, color = skinTone)
                 }
                 3 -> {
-                    // Stubble / Textured Scruff
+                    // Designer Stubble / 5 O'clock Shadow (Soft alpha hugging jaw and lip)
                     val stubbleRadius = headWidth * 0.42f
                     val stubbleRect = RoundRect(
-                        left = headLeft + 1f,
-                        top = headTop + headHeight * 0.58f,
-                        right = headLeft + headWidth - 1f,
-                        bottom = headTop + headHeight,
+                        left = headLeft + 1.5f,
+                        top = headTop + headHeight * 0.56f,
+                        right = headLeft + headWidth - 1.5f,
+                        bottom = headTop + headHeight + 0.5f,
                         bottomLeftCornerRadius = CornerRadius(stubbleRadius, stubbleRadius * 1.2f),
                         bottomRightCornerRadius = CornerRadius(stubbleRadius, stubbleRadius * 1.2f)
                     )
                     val stubblePath = Path().apply { addRoundRect(stubbleRect) }
-                    drawPath(stubblePath, color = hairColor.copy(alpha = 0.45f))
+                    drawPath(stubblePath, color = hairColor.copy(alpha = 0.35f))
                 }
             }
         }

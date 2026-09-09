@@ -39,8 +39,23 @@ class CareerRepository(private val context: Context, val slotId: Int = 1) {
     private val _latestSeasonSummaryFlow = MutableStateFlow<SeasonSummaryData?>(null)
     val latestSeasonSummaryFlow: StateFlow<SeasonSummaryData?> = _latestSeasonSummaryFlow.asStateFlow()
 
-    fun clearSeasonSummary() {
+    suspend fun clearSeasonSummary() {
         _latestSeasonSummaryFlow.value = null
+        db.withTransaction {
+            val gameState = dao.getGameStateSync() ?: return@withTransaction
+            if (gameState.pendingSeasonSummaryJson != null) {
+                gameState.pendingSeasonSummaryJson = null
+                dao.updateGameState(gameState)
+            }
+        }
+    }
+
+    suspend fun restorePendingSeasonSummaryIfNeeded() {
+        val gameState = dao.getGameStateSync() ?: return
+        val json = gameState.pendingSeasonSummaryJson
+        if (!json.isNullOrBlank() && _latestSeasonSummaryFlow.value == null) {
+            _latestSeasonSummaryFlow.value = SeasonSummaryData.deserialize(json)
+        }
     }
 
     suspend fun getPlayerSync(): PlayerEntity? = dao.getPlayerSync()
@@ -186,7 +201,9 @@ class CareerRepository(private val context: Context, val slotId: Int = 1) {
         squadNumber: Int = 9,
         backgroundStory: String = "Street Cages",
         faceDescriptor: String = "",
-        fatherFaceDescriptor: String? = null
+        fatherFaceDescriptor: String? = null,
+        firstName: String = "",
+        lastName: String = ""
     ) {
         db.withTransaction {
             // Read legacy list to preserve it if starting a son's career
@@ -356,8 +373,14 @@ class CareerRepository(private val context: Context, val slotId: Int = 1) {
                 faceDescriptor.ifBlank { FaceDescriptor.random(academyCountry).serialize() }
             }
 
+            val resolvedFirstName = if (firstName.isNotBlank()) firstName else playerName.split(" ").firstOrNull() ?: playerName
+            val resolvedLastName = if (lastName.isNotBlank()) lastName else playerName.split(" ").drop(1).joinToString(" ")
+            val resolvedFullName = if (playerName.isNotBlank()) playerName else "$resolvedFirstName $resolvedLastName".trim()
+
             val player = PlayerEntity(
-                name = playerName,
+                name = resolvedFullName,
+                firstName = resolvedFirstName,
+                lastName = resolvedLastName,
                 age = 13,
                 birthCountry = birthCountry,
                 academyCountry = academyCountry,
@@ -471,27 +494,36 @@ class CareerRepository(private val context: Context, val slotId: Int = 1) {
      */
     fun proximityDamping(current: Int, ceiling: Int): Float {
         if (ceiling <= 0) return 0f
-        val progress = (current.toFloat() / ceiling.toFloat()).coerceIn(0f, 1.05f)
-        return (1f - progress.pow(2.3f)).coerceIn(0.03f, 1f)
+        val progress = current.toFloat() / ceiling.toFloat()
+        return if (progress < 0.85f) {
+            1.0f
+        } else if (progress <= 1.0f) {
+            (1.0f - (progress - 0.85f) / 0.15f * 0.6f).coerceIn(0.25f, 1.0f)
+        } else {
+            // Soft cap past ceiling: slow down by 80% to allow specialist stats
+            (0.20f / (1f + (progress - 1.0f) * 4f)).coerceIn(0.05f, 0.20f)
+        }
     }
 
     /**
      * Computes the maximum OVR (and per-stat cap) this generation's player can ever reach.
-     * - Generation 1 always caps well below 99 (68) so a single career cannot max out immediately.
-     * - Each subsequent generation raises the baseline ceiling, reaching 99 around generation 5.
-     * - If the previous generation fell well short of THEIR OWN potential (achievementRatio < 1),
-     *   this generation's ceiling is pulled down below the generation's normal baseline — a
-     *   family that squanders its potential doesn't get the full generational step-up next time.
+     * - Gen 1 starts with randomized ceiling across a broad range (72..89, centered ~80) for variance.
+     * - Gen 2+ incorporates the father's legacy boost on top of a randomized base.
      */
     fun computePotentialCeiling(generation: Int, statBoost: Int, achievementRatio: Float): Int {
-        val baseCeiling = (68 + (generation - 1) * 8).coerceAtMost(99)
-        if (generation <= 1) return baseCeiling.coerceIn(60, 99)
+        val randomizedBase = if (generation <= 1) {
+            kotlin.random.Random.nextInt(72, 90)
+        } else {
+            kotlin.random.Random.nextInt(76, 91) + ((generation - 1) * 3).coerceAtMost(10)
+        }
+        val baseCeiling = randomizedBase.coerceAtMost(99)
+        if (generation <= 1) return baseCeiling.coerceIn(68, 96)
 
         val legacyNudge = (statBoost - 15) / 3f
-        val shortfall = (1f - achievementRatio).coerceIn(0f, 1f) // 0 = fully maxed potential, 1 = reached almost none of it
-        val achievementPenalty = shortfall * 10f // up to -10 ceiling points for badly squandering potential
+        val shortfall = (1f - achievementRatio).coerceIn(0f, 1f)
+        val achievementPenalty = shortfall * 8f
 
-        return (baseCeiling + legacyNudge - achievementPenalty).roundToInt().coerceIn(55, 99)
+        return (baseCeiling + legacyNudge - achievementPenalty).roundToInt().coerceIn(60, 99)
     }
 
     /**
@@ -737,6 +769,8 @@ class CareerRepository(private val context: Context, val slotId: Int = 1) {
                 player.youthAssists += pAssists
                 if (pMvp) player.youthMvps += 1
                 player.youthGamesPlayed += 1
+
+                applyYouthMatchPerformanceProgression(player, pGoals, pAssists, pMvp)
             }
 
             val hStand = standingsMap[fix.homeAcademyId]
@@ -763,6 +797,54 @@ class CareerRepository(private val context: Context, val slotId: Int = 1) {
             dao.updateYouthFixture(fix)
         }
         dao.updateYouthStandings(standingsMap.values.toList())
+    }
+
+    private fun applyYouthMatchPerformanceProgression(player: PlayerEntity, goals: Int, assists: Int, isMvp: Boolean) {
+        if (goals <= 0 && assists <= 0 && !isMvp) return
+
+        // Chance to gain finishing or technique per goal (up to attribute cap 85 for youth stage)
+        for (g in 0 until goals) {
+            if (Random.nextFloat() < 0.35f) {
+                if (Random.nextBoolean()) {
+                    if (player.finishing < 85) player.finishing += 1
+                } else {
+                    if (player.technique < 85) player.technique += 1
+                }
+            }
+        }
+
+        // Chance to gain passing or technique per assist
+        for (a in 0 until assists) {
+            if (Random.nextFloat() < 0.35f) {
+                if (Random.nextBoolean()) {
+                    if (player.passing < 85) player.passing += 1
+                } else {
+                    if (player.technique < 85) player.technique += 1
+                }
+            }
+        }
+
+        // MVP performance gains
+        if (isMvp) {
+            player.form = (player.form + 1).coerceAtMost(5)
+            player.morale = (player.morale + 3).coerceAtMost(100)
+            if (Random.nextFloat() < 0.30f) {
+                if (Random.nextBoolean()) {
+                    if (player.pace < 85) player.pace += 1
+                } else {
+                    if (player.physical < 85) player.physical += 1
+                }
+            }
+        }
+
+        // Recalculate OVR dynamically
+        player.ovr = calculateOvr(
+            finishing = player.finishing,
+            pace = player.pace,
+            passing = player.passing,
+            physical = player.physical,
+            technique = player.technique
+        )
     }
 
     private suspend fun resetYouthLeagueForNewSeason() {
@@ -844,6 +926,8 @@ class CareerRepository(private val context: Context, val slotId: Int = 1) {
                     player.youthAssists += pAssists
                     if (pMvp) player.youthMvps += 1
                     player.streetFootballGamesThisSeason += 1
+
+                    applyYouthMatchPerformanceProgression(player, pGoals, pAssists, pMvp)
 
                     val summaryPrefix = when (player.backgroundStory) {
                         "School Team" -> "School team discipline: "
@@ -2171,6 +2255,8 @@ class CareerRepository(private val context: Context, val slotId: Int = 1) {
                     rank = rank
                 )
             )
+            gameState.pendingSeasonSummaryJson = summaryData.serialize()
+            dao.updateGameState(gameState)
             _latestSeasonSummaryFlow.value = summaryData
         }
 
@@ -2430,7 +2516,9 @@ private suspend fun adjustClubsReputations(
     private fun applyStatGrowth(current: Int, growth: Float, ceiling: Int = 99): Int {
         val damping = proximityDamping(current, ceiling)
         val nextStat = current + (growth * damping).roundToInt()
-        return nextStat.coerceIn(1, ceiling)
+        // Individual stats can grow up to 99 even if player's composite ceiling is lower;
+        // composite OVR is clamped to potentialCeiling separately.
+        return nextStat.coerceIn(1, 99)
     }
 
     /**
@@ -2598,7 +2686,14 @@ private suspend fun adjustClubsReputations(
             (repDiff <= 1) || isEliteMove
         }
 
-        val generatedOffers = eligibleTargets.shuffled().take(3).map { club ->
+        val count = when {
+            player.ovr > 75 && player.form >= 1 -> Random.nextInt(2, 4)
+            player.ovr > 70 && player.form >= 0 -> Random.nextInt(1, 3)
+            else -> 1
+        }.coerceIn(1, 3)
+
+        val candidateClubs = if (eligibleTargets.isNotEmpty()) eligibleTargets else allClubs.filter { it.id != player.currentClubId }
+        val generatedOffers = candidateClubs.shuffled().take(count).map { club ->
             TransferOffer(
                 clubId = club.id,
                 clubName = club.name,
@@ -3051,6 +3146,9 @@ private suspend fun adjustClubsReputations(
         // 5a. STRIKER MOVEMENT PASS
         // -------------------------------------------------------------
         val activeStrikers = dao.getAllNpcStrikersSync().filter { !it.isRetired }.toMutableList()
+        val playerClubArrivals = mutableListOf<String>()
+        val playerClubDepartures = mutableListOf<String>()
+        val keyLeagueMoves = mutableListOf<String>()
 
         for (striker in activeStrikers) {
             striker.age += 1
@@ -3156,51 +3254,85 @@ private suspend fun adjustClubsReputations(
                     dao.insertNpcStriker(vacStriker)
 
                     if (newClub.id == player.currentClubId) {
-                        val logText = "🔄 ${striker.name} (${striker.ovr} OVR) has joined ${newClub.name} — expect real competition for minutes."
-                        seasonLogs.add(logText)
-                        narrativeLogs.add(logText)
+                        playerClubArrivals.add("${striker.name} (${striker.ovr} OVR)")
                         player.rivalRelationship = 50
-
-                        val maxSeq = (dao.getMaxSocialPostSequenceIndex() ?: 0) + 1
-                        dao.insertSocialPost(
-                            SocialPostEntity(
-                                sequenceIndex = maxSeq,
-                                seasonNumber = gameState.currentSeason,
-                                monthIndex = gameState.currentMonthIndex,
-                                postType = "CLUB_NEWS",
-                                authorName = "Transfer Deadline",
-                                authorHandle = "@TransferNews",
-                                authorInitials = "TN",
-                                content = "🔄 TRANSFER OFFICIAL: ${striker.name} (${striker.ovr} OVR) has joined ${newClub.name}!",
-                                isAboutPlayerOrClub = true,
-                                relatedClubId = player.currentClubId,
-                                likeCount = Random.nextInt(1000, 25000)
-                            )
-                        )
                     } else if (oldClub.id == player.currentClubId) {
-                        val logText = "🔄 ${striker.name} (${striker.ovr} OVR) has departed ${oldClub.name} for ${newClub.name}."
-                        seasonLogs.add(logText)
-                        narrativeLogs.add(logText)
-
-                        val maxSeq = (dao.getMaxSocialPostSequenceIndex() ?: 0) + 1
-                        dao.insertSocialPost(
-                            SocialPostEntity(
-                                sequenceIndex = maxSeq,
-                                seasonNumber = gameState.currentSeason,
-                                monthIndex = gameState.currentMonthIndex,
-                                postType = "CLUB_NEWS",
-                                authorName = "Transfer Deadline",
-                                authorHandle = "@TransferNews",
-                                authorInitials = "TN",
-                                content = "🔄 TRANSFER OFFICIAL: ${striker.name} (${striker.ovr} OVR) has departed ${oldClub.name} for ${newClub.name}.",
-                                isAboutPlayerOrClub = true,
-                                relatedClubId = player.currentClubId,
-                                likeCount = Random.nextInt(1000, 25000)
-                            )
-                        )
+                        playerClubDepartures.add("${striker.name} (${striker.ovr} OVR, to ${newClub.name})")
+                    } else if (striker.ovr >= 78 || newClub.reputation == "ELITE") {
+                        keyLeagueMoves.add("${striker.name} (${striker.ovr} OVR) ➔ ${newClub.name}")
                     }
                 }
             }
+        }
+
+        if (playerClubArrivals.isNotEmpty()) {
+            val playerClubName = clubsMap[player.currentClubId]?.name ?: "your club"
+            val arrivalsStr = playerClubArrivals.joinToString(", ")
+            val logText = "🔄 SQUAD ARRIVALS: $arrivalsStr joined $playerClubName — expect real competition for minutes."
+            seasonLogs.add(logText)
+            narrativeLogs.add(logText)
+
+            val maxSeq = (dao.getMaxSocialPostSequenceIndex() ?: 0) + 1
+            dao.insertSocialPost(
+                SocialPostEntity(
+                    sequenceIndex = maxSeq,
+                    seasonNumber = gameState.currentSeason,
+                    monthIndex = gameState.currentMonthIndex,
+                    postType = "CLUB_NEWS",
+                    authorName = "Transfer Deadline",
+                    authorHandle = "@TransferNews",
+                    authorInitials = "TN",
+                    content = "🔄 TRANSFER ROUNDUP: New attacking arrival(s) at $playerClubName: $arrivalsStr!",
+                    isAboutPlayerOrClub = true,
+                    relatedClubId = player.currentClubId,
+                    likeCount = Random.nextInt(5000, 30000)
+                )
+            )
+        }
+
+        if (playerClubDepartures.isNotEmpty()) {
+            val playerClubName = clubsMap[player.currentClubId]?.name ?: "your club"
+            val departuresStr = playerClubDepartures.joinToString(", ")
+            val logText = "🔄 SQUAD DEPARTURES: $departuresStr departed from $playerClubName."
+            seasonLogs.add(logText)
+            narrativeLogs.add(logText)
+
+            val maxSeq = (dao.getMaxSocialPostSequenceIndex() ?: 0) + 1
+            dao.insertSocialPost(
+                SocialPostEntity(
+                    sequenceIndex = maxSeq,
+                    seasonNumber = gameState.currentSeason,
+                    monthIndex = gameState.currentMonthIndex,
+                    postType = "CLUB_NEWS",
+                    authorName = "Transfer Deadline",
+                    authorHandle = "@TransferNews",
+                    authorInitials = "TN",
+                    content = "🔄 SQUAD UPDATE: Outgoing transfers confirmed at $playerClubName: $departuresStr.",
+                    isAboutPlayerOrClub = true,
+                    relatedClubId = player.currentClubId,
+                    likeCount = Random.nextInt(3000, 25000)
+                )
+            )
+        }
+
+        if (keyLeagueMoves.isNotEmpty() && playerClubArrivals.isEmpty()) {
+            val maxSeq = (dao.getMaxSocialPostSequenceIndex() ?: 0) + 1
+            val sampleMoves = keyLeagueMoves.take(3).joinToString("; ")
+            dao.insertSocialPost(
+                SocialPostEntity(
+                    sequenceIndex = maxSeq,
+                    seasonNumber = gameState.currentSeason,
+                    monthIndex = gameState.currentMonthIndex,
+                    postType = "CLUB_NEWS",
+                    authorName = "Transfer Deadline",
+                    authorHandle = "@TransferNews",
+                    authorInitials = "TN",
+                    content = "🔄 DEADLINE DAY WRAP: Notable moves across the division: $sampleMoves.",
+                    isAboutPlayerOrClub = false,
+                    relatedClubId = null,
+                    likeCount = Random.nextInt(4000, 20000)
+                )
+            )
         }
 
         dao.updateNpcStrikers(activeStrikers)
@@ -3403,6 +3535,8 @@ private suspend fun adjustClubsReputations(
             gameState.narrativeLog = capNarrativeLog(narrativeLogs.joinToString("\n\n") + "\n\n" + gameState.narrativeLog)
             dao.updateGameState(gameState)
         }
+
+        dao.pruneOldSocialPosts()
     }
 
     private fun getNextHigherReputationTier(tier: String): String {

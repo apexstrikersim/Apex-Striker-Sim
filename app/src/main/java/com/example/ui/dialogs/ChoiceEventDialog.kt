@@ -5,7 +5,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -24,6 +24,7 @@ fun ChoiceEventDialog(viewModel: CareerViewModel, gameState: GameStateEntity) {
     val option1 = gameState.activeChoiceOption1 ?: "Option 1"
     val option2 = gameState.activeChoiceOption2 ?: "Option 2"
     val option3 = gameState.activeChoiceOption3
+    var isResolving by remember { mutableStateOf(false) }
 
     Dialog(onDismissRequest = { /* Force decision, cannot dismiss */ }) {
         Card(
@@ -72,7 +73,10 @@ fun ChoiceEventDialog(viewModel: CareerViewModel, gameState: GameStateEntity) {
                     shape = RoundedCornerShape(12.dp),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clickable { viewModel.resolveChoice(1) }
+                        .clickable(enabled = !isResolving) {
+                            isResolving = true
+                            viewModel.resolveChoice(1)
+                        }
                         .testTag("choice_option_1")
                 ) {
                     Row(
@@ -96,7 +100,10 @@ fun ChoiceEventDialog(viewModel: CareerViewModel, gameState: GameStateEntity) {
                     shape = RoundedCornerShape(12.dp),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clickable { viewModel.resolveChoice(2) }
+                        .clickable(enabled = !isResolving) {
+                            isResolving = true
+                            viewModel.resolveChoice(2)
+                        }
                         .testTag("choice_option_2")
                 ) {
                     Row(
@@ -121,7 +128,10 @@ fun ChoiceEventDialog(viewModel: CareerViewModel, gameState: GameStateEntity) {
                         shape = RoundedCornerShape(12.dp),
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clickable { viewModel.resolveChoice(3) }
+                            .clickable(enabled = !isResolving) {
+                                isResolving = true
+                                viewModel.resolveChoice(3)
+                            }
                             .testTag("choice_option_3")
                     ) {
                         Row(

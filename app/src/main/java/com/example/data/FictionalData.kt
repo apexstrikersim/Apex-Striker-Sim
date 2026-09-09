@@ -173,6 +173,16 @@ object FictionalData {
         return "${firsts.random()} ${lasts.random()}"
     }
 
+    fun generateRandomFirstName(country: String): String {
+        val firsts = FIRST_NAMES[country] ?: FIRST_NAMES["England"]!!
+        return firsts.random()
+    }
+
+    fun generateRandomLastName(country: String): String {
+        val lasts = LAST_NAMES[country] ?: LAST_NAMES["England"]!!
+        return lasts.random()
+    }
+
     fun getReputationPoints(reputation: String): Int {
         return when (reputation) {
             "ELITE" -> 90

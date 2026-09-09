@@ -37,10 +37,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.FaceDescriptor
+import com.example.data.FictionalData
 import com.example.ui.CareerViewModel
 import com.example.ui.components.CountryFlagIcon
 import com.example.ui.components.JerseyNumberIcon
-import com.example.ui.components.PlayerFaceIcon
 import com.example.ui.components.RepeatingStepperButton
 import com.example.ui.theme.*
 
@@ -49,12 +49,14 @@ fun SetupScreen(viewModel: CareerViewModel) {
     val keyboardController = LocalSoftwareKeyboardController.current
     val focusManager = LocalFocusManager.current
 
-    var name by remember { mutableStateOf("") }
+    var firstName by remember { mutableStateOf("") }
+    var lastName by remember { mutableStateOf("") }
     var selectedBirthCountry by remember { mutableStateOf("England") }
     var preferredFoot by remember { mutableStateOf("Right") }
     var squadNumber by remember { mutableIntStateOf(9) }
     var backgroundStory by remember { mutableStateOf("Street Cages") }
-    var isInputFocused by remember { mutableStateOf(false) }
+    var isFirstNameFocused by remember { mutableStateOf(false) }
+    var isLastNameFocused by remember { mutableStateOf(false) }
 
     val countries = listOf("England", "Spain", "France", "Germany", "Italy")
     val feet = listOf("Left", "Right", "Both")
@@ -69,10 +71,6 @@ fun SetupScreen(viewModel: CareerViewModel) {
             "Italy" -> "ITA"
             else -> country.take(3).uppercase()
         }
-    }
-
-    var faceDescriptor by remember(selectedBirthCountry) {
-        mutableStateOf(FaceDescriptor.random(getCountryCode(selectedBirthCountry)))
     }
 
     Column(
@@ -168,53 +166,43 @@ fun SetupScreen(viewModel: CareerViewModel) {
                 modifier = Modifier.padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Text(
-                    text = "PLAYER IDENTITY",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = PitchGreen
-                )
-
-                // Face Preview & Name input row
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .size(52.dp)
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(DarkSlate)
-                            .border(1.dp, BorderColor, RoundedCornerShape(12.dp)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        PlayerFaceIcon(
-                            descriptor = faceDescriptor,
-                            age = 16,
-                            modifier = Modifier.size(46.dp)
-                        )
-                    }
-
+                    Text(
+                        text = "PLAYER IDENTITY",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = PitchGreen
+                    )
                     IconButton(
                         onClick = {
-                            faceDescriptor = FaceDescriptor.random(getCountryCode(selectedBirthCountry))
+                            firstName = FictionalData.generateRandomFirstName(selectedBirthCountry)
+                            lastName = FictionalData.generateRandomLastName(selectedBirthCountry)
                         },
                         modifier = Modifier
-                            .size(44.dp)
-                            .clip(RoundedCornerShape(12.dp))
+                            .size(36.dp)
+                            .clip(RoundedCornerShape(8.dp))
                             .background(DarkSlate)
-                            .border(1.dp, BorderColor, RoundedCornerShape(12.dp))
-                            .testTag("reroll_face_button")
+                            .border(1.dp, BorderColor, RoundedCornerShape(8.dp))
+                            .testTag("randomize_name_button")
                     ) {
                         Icon(
                             imageVector = Icons.Default.Shuffle,
-                            contentDescription = "Reroll Face",
+                            contentDescription = "Randomize Name",
                             tint = PitchGreen,
-                            modifier = Modifier.size(20.dp)
+                            modifier = Modifier.size(18.dp)
                         )
                     }
+                }
 
-                    // Name input
+                // First Name and Last Name inputs row
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    // First Name input
                     Box(
                         modifier = Modifier
                             .weight(1f)
@@ -223,7 +211,7 @@ fun SetupScreen(viewModel: CareerViewModel) {
                             .background(DarkSlate)
                             .border(
                                 width = 1.dp,
-                                color = if (isInputFocused || name.isNotEmpty()) PitchGreen else BorderColor,
+                                color = if (isFirstNameFocused || firstName.isNotEmpty()) PitchGreen else BorderColor,
                                 shape = RoundedCornerShape(12.dp)
                             )
                             .padding(horizontal = 12.dp),
@@ -233,18 +221,11 @@ fun SetupScreen(viewModel: CareerViewModel) {
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.Person,
-                                contentDescription = "Person Icon",
-                                tint = if (isInputFocused || name.isNotEmpty()) PitchGreen else TextSecondary,
-                                modifier = Modifier.size(18.dp)
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
                             BasicTextField(
-                                value = name,
+                                value = firstName,
                                 onValueChange = { input ->
-                                    val filtered = input.filter { it.isLetter() || it == ' ' || it == '-' || it == '\'' }
-                                    if (filtered.length <= 24) name = filtered
+                                    val filtered = input.filter { it.isLetter() || it == '-' || it == '\'' }
+                                    if (filtered.length <= 16) firstName = filtered
                                 },
                                 singleLine = true,
                                 keyboardOptions = KeyboardOptions(
@@ -257,14 +238,72 @@ fun SetupScreen(viewModel: CareerViewModel) {
                                     fontWeight = FontWeight.Medium
                                 ),
                                 modifier = Modifier
-                                    .weight(1f)
-                                    .onFocusChanged { isInputFocused = it.isFocused }
-                                    .testTag("name_input"),
+                                    .fillMaxWidth()
+                                    .onFocusChanged { isFirstNameFocused = it.isFocused }
+                                    .testTag("first_name_input"),
                                 decorationBox = { innerTextField ->
                                     Box(contentAlignment = Alignment.CenterStart) {
-                                        if (name.isEmpty()) {
+                                        if (firstName.isEmpty()) {
                                             Text(
-                                                text = "Character Name",
+                                                text = "First Name",
+                                                color = TextSecondary,
+                                                style = TextStyle(
+                                                    fontSize = 15.sp,
+                                                    fontWeight = FontWeight.Medium
+                                                )
+                                            )
+                                        }
+                                        innerTextField()
+                                    }
+                                }
+                            )
+                        }
+                    }
+
+                    // Last Name input
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(52.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(DarkSlate)
+                            .border(
+                                width = 1.dp,
+                                color = if (isLastNameFocused || lastName.isNotEmpty()) PitchGreen else BorderColor,
+                                shape = RoundedCornerShape(12.dp)
+                            )
+                            .padding(horizontal = 12.dp),
+                        contentAlignment = Alignment.CenterStart
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            BasicTextField(
+                                value = lastName,
+                                onValueChange = { input ->
+                                    val filtered = input.filter { it.isLetter() || it == '-' || it == '\'' || it == ' ' }
+                                    if (filtered.length <= 20) lastName = filtered
+                                },
+                                singleLine = true,
+                                keyboardOptions = KeyboardOptions(
+                                    keyboardType = KeyboardType.Text,
+                                    capitalization = KeyboardCapitalization.Words
+                                ),
+                                textStyle = TextStyle(
+                                    color = TextPrimary,
+                                    fontSize = 15.sp,
+                                    fontWeight = FontWeight.Medium
+                                ),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .onFocusChanged { isLastNameFocused = it.isFocused }
+                                    .testTag("last_name_input"),
+                                decorationBox = { innerTextField ->
+                                    Box(contentAlignment = Alignment.CenterStart) {
+                                        if (lastName.isEmpty()) {
+                                            Text(
+                                                text = "Last Name",
                                                 color = TextSecondary,
                                                 style = TextStyle(
                                                     fontSize = 15.sp,
@@ -536,23 +575,30 @@ fun SetupScreen(viewModel: CareerViewModel) {
         }
 
         // 6. CREATE CAREER BUTTON
+        val isNameValid = firstName.trim().isNotBlank() && lastName.trim().isNotBlank()
         Button(
             onClick = {
-                if (name.isNotBlank()) {
+                if (isNameValid) {
                     keyboardController?.hide()
                     focusManager.clearFocus()
+                    val fName = firstName.trim()
+                    val lName = lastName.trim()
+                    val fullName = "$fName $lName"
+                    val generatedFace = FaceDescriptor.random(getCountryCode(selectedBirthCountry)).serialize()
                     viewModel.createCharacter(
-                        name = name.trim(),
+                        name = fullName,
                         birth = selectedBirthCountry,
                         academy = selectedBirthCountry,
                         preferredFoot = preferredFoot,
                         squadNumber = squadNumber,
                         backgroundStory = backgroundStory,
-                        faceDescriptor = faceDescriptor.serialize()
+                        faceDescriptor = generatedFace,
+                        firstName = fName,
+                        lastName = lName
                     )
                 }
             },
-            enabled = name.isNotBlank(),
+            enabled = isNameValid,
             colors = ButtonDefaults.buttonColors(
                 containerColor = PitchGreen,
                 contentColor = SportsDarkBg,

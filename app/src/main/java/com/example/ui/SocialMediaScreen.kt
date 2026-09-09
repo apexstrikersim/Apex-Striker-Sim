@@ -162,6 +162,19 @@ fun SocialMediaScreen(viewModel: CareerViewModel) {
                     }
                 }
             } else {
+                val maxSequenceIndex = remember(socialPosts) {
+                    socialPosts.maxOfOrNull { it.sequenceIndex } ?: 0
+                }
+                val currentPlayer = player
+                val playerInitials = remember(currentPlayer) {
+                    if (currentPlayer != null) {
+                        val f = currentPlayer.firstName.firstOrNull()?.uppercaseChar()?.toString() ?: ""
+                        val l = currentPlayer.lastName.firstOrNull()?.uppercaseChar()?.toString() ?: ""
+                        val initials = "$f$l".trim()
+                        if (initials.isNotEmpty()) initials else currentPlayer.name.take(2).uppercase()
+                    } else "ME"
+                }
+
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
@@ -170,7 +183,8 @@ fun SocialMediaScreen(viewModel: CareerViewModel) {
                     items(displayedPosts, key = { it.id }) { post ->
                         SocialPostCard(
                             post = post,
-                            playerInitials = player?.name?.take(2)?.uppercase() ?: "ME",
+                            currentMaxSequenceIndex = maxSequenceIndex,
+                            playerInitials = playerInitials,
                             onReplySelected = { replyIndex ->
                                 viewModel.submitSocialPostReply(post, replyIndex) { /* effects applied silently */ }
                             }
@@ -185,6 +199,7 @@ fun SocialMediaScreen(viewModel: CareerViewModel) {
 @Composable
 fun SocialPostCard(
     post: SocialPostEntity,
+    currentMaxSequenceIndex: Int,
     playerInitials: String,
     onReplySelected: (Int) -> Unit
 ) {
@@ -204,6 +219,11 @@ fun SocialPostCard(
         "FUN_FACT" -> "FUN FACT"
         else -> post.postType
     }
+
+    val monthNames = listOf("Aug", "Sep", "Oct", "Nov", "Dec", "Jan", "Feb", "Mar", "Apr", "May")
+    val postMonth = monthNames.getOrElse(post.monthIndex.coerceIn(0, 9)) { "M${post.monthIndex + 1}" }
+    val postDateText = "$postMonth • S${post.seasonNumber}"
+    val isExpired = post.isReplyExpired(currentMaxSequenceIndex)
 
     Column(
         modifier = Modifier
@@ -245,13 +265,28 @@ fun SocialPostCard(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
-                Text(
-                    text = post.authorHandle,
-                    fontSize = 11.sp,
-                    color = TextSecondary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Text(
+                        text = post.authorHandle,
+                        fontSize = 11.sp,
+                        color = TextSecondary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        text = "•",
+                        fontSize = 10.sp,
+                        color = TextSecondary.copy(alpha = 0.5f)
+                    )
+                    Text(
+                        text = postDateText,
+                        fontSize = 11.sp,
+                        color = TextSecondary.copy(alpha = 0.8f)
+                    )
+                }
             }
 
             Box(
@@ -301,22 +336,30 @@ fun SocialPostCard(
             Spacer(modifier = Modifier.weight(1f))
 
             if (post.isReplyable && !post.hasReplied) {
-                Surface(
-                    shape = RoundedCornerShape(12.dp),
-                    color = PitchGreen.copy(alpha = if (isReplying) 0.3f else 0.15f),
-                    border = BorderStroke(1.dp, PitchGreen.copy(alpha = 0.5f)),
-                    modifier = Modifier.clickable { isReplying = !isReplying }
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                if (isExpired) {
+                    Text(
+                        text = "⌛ Expired",
+                        fontSize = 11.sp,
+                        color = TextSecondary.copy(alpha = 0.6f)
+                    )
+                } else {
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = PitchGreen.copy(alpha = if (isReplying) 0.3f else 0.15f),
+                        border = BorderStroke(1.dp, PitchGreen.copy(alpha = 0.5f)),
+                        modifier = Modifier.clickable { isReplying = !isReplying }
                     ) {
-                        Text(
-                            text = if (isReplying) "Cancel ✕" else "💬 Reply (${listOfNotNull(post.reply1Text, post.reply2Text, post.reply3Text).size})",
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = PitchGreen
-                        )
+                        Row(
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = if (isReplying) "Cancel ✕" else "💬 Reply (${listOfNotNull(post.reply1Text, post.reply2Text, post.reply3Text).size})",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = PitchGreen
+                            )
+                        }
                     }
                 }
             }
@@ -343,7 +386,7 @@ fun SocialPostCard(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Box(
                             modifier = Modifier
-                                .size(22.dp)
+                                .size(24.dp)
                                 .clip(CircleShape)
                                 .background(DarkSlate)
                                 .border(1.dp, PitchGreen, CircleShape),
@@ -351,7 +394,7 @@ fun SocialPostCard(
                         ) {
                             Text(
                                 text = playerInitials,
-                                fontSize = 7.sp,
+                                fontSize = 10.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = PitchGreen,
                                 maxLines = 1,
