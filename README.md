@@ -1,6 +1,6 @@
 # Apex Striker Career
 
-**v2.8.0** • A single-player, text-driven soccer career simulation built with **Kotlin** and **Jetpack Compose** for Android.
+**v2.8.0** • A single-player, text-driven soccer career simulation built with **Kotlin** and **Jetpack Compose** for Android. **TEST**
 
 You are a young striker starting in the concrete cages of your hometown and working your way up to European stadiums, trophies, and eventually a **multi-generational football legacy**. There are no real clubs, no live multiplayer, and no microtransactions — just a tight loop of matches, training, transfers, and story.
 
