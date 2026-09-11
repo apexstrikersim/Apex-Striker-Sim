@@ -29,6 +29,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.data.AppVersion
 import com.example.data.GameStateEntity
 import com.example.ui.CareerViewModel
+import com.example.ui.ImmersiveDialogEffect
 import com.example.ui.components.bounceClick
 import com.example.ui.components.AnimatedSaveButton
 import com.example.ui.theme.*
@@ -77,6 +78,7 @@ fun SettingsDialog(viewModel: CareerViewModel, gameState: GameStateEntity?) {
         focusManager.clearFocus()
         viewModel.showSettings(false)
     }) {
+        ImmersiveDialogEffect()
         Card(
             colors = CardDefaults.cardColors(containerColor = SportsCardBg),
             shape = RoundedCornerShape(20.dp),
@@ -747,7 +749,7 @@ fun SettingsDialog(viewModel: CareerViewModel, gameState: GameStateEntity?) {
                 item {
                     Spacer(modifier = Modifier.height(10.dp))
                     Text(
-                        text = "Version ${AppVersion.CURRENT} (Striker Edition)",
+                        text = AppVersion.DISPLAY,
                         fontSize = 11.sp,
                         color = TextSecondary,
                         textAlign = TextAlign.Center,

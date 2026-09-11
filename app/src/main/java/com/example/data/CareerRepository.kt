@@ -247,14 +247,31 @@ class CareerRepository(private val context: Context, val slotId: Int = 1) {
                         val stadiumPart = listOf("Arena", "Park", "Stadium", "Ground", "Coliseum").random()
                         val cleanName = template.name.replace(" Rovers", "").replace(" Town", "").replace(" United", "").replace(" City", "").replace(" Athletic", "").replace(" FC", "").replace(" CD", "").replace(" AS", "").replace(" US", "").replace(" SV", "").replace(" AC", "").replace(" Real", "")
                         val stadium = "$cleanName $stadiumPart"
-                        val style = listOf(
+                        val openerVariant = listOf(
+                            "Widely known as $nickname, they",
+                            "Playing under the $nickname banner, the club",
+                            "$nickname, as they're known locally,",
+                            "Carrying the $nickname nickname, this side"
+                        ).random()
+                        val tacticalIdentity = listOf(
                             "Known for their high-pressing offensive philosophy and deep-rooted community pride.",
                             "Famous for their rock-solid defensive organization and clinical counter-attacking football.",
                             "Renowned for their fluid possession-based style and a rich history of nurturing world-class talents.",
                             "Distinguished by their aggressive aerial play, unmatched work rate, and passionate fanbase.",
-                            "Highly regarded for tactical flexibility, high stamina levels, and a relentless winning mentality."
+                            "Highly regarded for tactical flexibility, high stamina levels, and a relentless winning mentality.",
+                            "Known for lightning-fast wing play, incisive transition breaks, and unrelenting forward energy.",
+                            "Famous for a pragmatic low block combined with lethal efficiency on attacking set pieces.",
+                            "Renowned for patient midfield buildup, pinpoint short passing, and suffocating territory control."
                         ).random()
-                        val description = "Widely known as $nickname, they play their home matches at the prestigious $stadium. $style"
+                        val cultureNote = listOf(
+                            "The academy has a reputation for producing hard-working locals rather than marquee signings.",
+                            "Boardroom stability has been rare, with managerial turnover a running theme.",
+                            "Supporters are known throughout the league for a raucous atmosphere on European nights.",
+                            "The club's youth setup punches well above its weight for a side of this size.",
+                            "Deep community roots anchor the club, with generations of local families filling the stands.",
+                            "A fiercely proud fan culture creates an intimidating environment for any traveling opponent."
+                        ).random()
+                        val description = "$openerVariant play their home matches at the prestigious $stadium. $tacticalIdentity $cultureNote"
 
                         allClubs.add(
                             ClubEntity(
@@ -837,14 +854,14 @@ class CareerRepository(private val context: Context, val slotId: Int = 1) {
             }
         }
 
-        // Recalculate OVR dynamically
+        // Recalculate OVR dynamically, clamped to this player's generation ceiling
         player.ovr = calculateOvr(
             finishing = player.finishing,
             pace = player.pace,
             passing = player.passing,
             physical = player.physical,
             technique = player.technique
-        )
+        ).coerceAtMost(player.potentialCeiling)
     }
 
     private suspend fun resetYouthLeagueForNewSeason() {
@@ -955,7 +972,22 @@ class CareerRepository(private val context: Context, val slotId: Int = 1) {
 
                 if (isTransferWindow && eligibleAcademies.isNotEmpty() && gameState.persistedYouthOffers.isNullOrEmpty()) {
                     val offers = eligibleAcademies.take(3).mapIndexed { index, ac ->
-                        val report = YouthCareerLogic.generateScoutReportText(player, ac.academyName, ac.youthRivalName, ac.youthRivalOvr, index, ac.parentReputation)
+                        val offerRng = kotlin.random.Random(
+                            ac.id.toLong() * 1_000_003L +
+                            player.ovr.toLong() * 97L +
+                            player.finishing.toLong() * 31L +
+                            player.pace.toLong() +
+                            index.toLong() * 13L
+                        )
+                        val report = YouthCareerLogic.generateScoutReportText(
+                            player = player,
+                            targetName = ac.academyName,
+                            rivalName = ac.youthRivalName,
+                            rivalOvr = ac.youthRivalOvr,
+                            offerIndex = index,
+                            parentReputation = ac.parentReputation,
+                            rng = offerRng
+                        )
                         YouthScoutOffer(
                             academyId = ac.id,
                             academyName = ac.academyName,
@@ -2874,68 +2906,177 @@ private suspend fun adjustClubsReputations(
         totalGames: Int,
         clubsPlayedStr: String
     ): String {
-        val rng = kotlin.random.Random(player.generation.toLong())
+        val rng = kotlin.random.Random(
+            player.generation.toLong() * 1_000_003L +
+            totalGoals.toLong() * 97L +
+            totalGames.toLong() * 31L +
+            peakOvr.toLong()
+        )
         val name = player.name
 
-        // 1. PEAK OVR TIER
-        val openingLines = when {
-            peakOvr >= 90 -> listOf(
-                "$name retires as one of the true greats of the era, a player defenses feared and fans idolized wherever they played.",
-                "$name closes the chapter on a legendary career, cementing a legacy amongst footballing royalty.",
-                "$name leaves the game at the very pinnacle of world football, revered as an unstoppable attacking force.",
-                "$name hangs up their boots as an iconic generational talent whose extraordinary quality thrilled supporters worldwide."
-            )
-            peakOvr in 80..89 -> listOf(
-                "$name built a career among the finest strikers of their generation, consistently delivering when it mattered most.",
-                "$name steps away from professional football having established a formidable reputation at the highest levels of the game.",
-                "$name completes a stellar professional journey, recognized as a dangerous and highly reliable attacking focal point.",
-                "$name retires after years of high-level performances, earning widespread acclaim for composure in front of goal."
-            )
-            peakOvr in 65..79 -> listOf(
-                "$name carved out a respected, dependable career as a professional footballer, earning the trust of teammates and coaches alike.",
-                "$name brings an honest and hardworking career to an end, leaving behind a legacy of determination and discipline.",
-                "$name closes a solid tenure in professional football, having consistently put in relentless efforts for every club served.",
-                "$name concludes their professional journey with pride, respected across the league as a committed professional."
-            )
-            else -> listOf(
-                "$name may not have reached the very top, but gave everything to the game across a long and honest career.",
-                "$name retires with head held high, having poured every ounce of passion into a gritty professional journey.",
-                "$name completes a career defined by persistence and heart, battling through every challenge on the pitch.",
-                "$name hangs up their boots after a dedicated career, always displaying immense pride whenever stepping onto the pitch."
-            )
+        // 1. PEAK OVR TIER - Verb phrase + Legacy phrase (6 options each)
+        val openingLine = when {
+            peakOvr >= 90 -> {
+                val verbPhrases90 = listOf(
+                    "retires as one of the true greats of the era",
+                    "closes the chapter on a legendary career",
+                    "leaves the game at the very pinnacle of world football",
+                    "hangs up their boots as an iconic generational talent",
+                    "steps away having reached the summit of the sport",
+                    "bows out after redefining what it means to lead the line"
+                )
+                val legacyPhrases90 = listOf(
+                    "a player defenses feared and fans idolized wherever they played",
+                    "cementing a legacy amongst footballing royalty",
+                    "revered as an unstoppable attacking force",
+                    "whose extraordinary quality thrilled supporters worldwide",
+                    "remembered as one of the sport's defining number 9s",
+                    "leaving behind highlight reels that will be watched for decades"
+                )
+                "$name ${verbPhrases90[rng.nextInt(verbPhrases90.size)]}, ${legacyPhrases90[rng.nextInt(legacyPhrases90.size)]}."
+            }
+            peakOvr in 80..89 -> {
+                val verbPhrases80 = listOf(
+                    "built a career among the finest strikers of their generation",
+                    "steps away from professional football having established a formidable reputation",
+                    "completes a stellar professional journey at the senior level",
+                    "retires after years of consistently high-level performances",
+                    "calls time on an admirable and distinguished attacking career",
+                    "walks away with the respect of the highest tiers of the sport"
+                )
+                val legacyPhrases80 = listOf(
+                    "consistently delivering when it mattered most",
+                    "recognized as a dangerous and highly reliable attacking focal point",
+                    "earning widespread acclaim for composure in front of goal",
+                    "celebrated as a clinical finisher capable of deciding any match",
+                    "leaving an indelible mark with crucial goals on the biggest stages",
+                    "remembered as a nightmare for opposing center-backs week in and week out"
+                )
+                "$name ${verbPhrases80[rng.nextInt(verbPhrases80.size)]}, ${legacyPhrases80[rng.nextInt(legacyPhrases80.size)]}."
+            }
+            peakOvr in 65..79 -> {
+                val verbPhrases65 = listOf(
+                    "carved out a respected, dependable career as a professional footballer",
+                    "brings an honest and hardworking career to an end",
+                    "closes a solid and committed tenure in professional football",
+                    "concludes their playing journey with immense personal pride",
+                    "hangs up the boots after a steadfast and dedicated career",
+                    "bows out after years of honest graft leading the frontline"
+                )
+                val legacyPhrases65 = listOf(
+                    "earning the deep trust of teammates and coaches alike",
+                    "leaving behind a legacy of determination and discipline",
+                    "having consistently put in relentless efforts for every club served",
+                    "respected across the league as a consummate team-first professional",
+                    "remembered for tireless work rate and steadfast commitment to the shirt",
+                    "valued everywhere for holding the line with grit and resilience"
+                )
+                "$name ${verbPhrases65[rng.nextInt(verbPhrases65.size)]}, ${legacyPhrases65[rng.nextInt(legacyPhrases65.size)]}."
+            }
+            else -> {
+                val verbPhrasesElse = listOf(
+                    "may not have reached the very top, but gave everything to the game",
+                    "retires with head held high from a gritty professional journey",
+                    "completes a career defined by persistence, resilience, and heart",
+                    "hangs up their boots after a fiercely dedicated playing journey",
+                    "steps away having fought relentlessly through every level of the game",
+                    "closes their chapter on the pitch having emptied the tank completely"
+                )
+                val legacyPhrasesElse = listOf(
+                    "pouring every ounce of passion into each minute played",
+                    "battling through every setback and challenge on the pitch",
+                    "always displaying immense pride whenever stepping across the white lines",
+                    "embodying the spirit of an honest professional who never backed down",
+                    "earning the genuine admiration of supporters for sheer determination",
+                    "leaving behind an enduring example of heart and perseverance"
+                )
+                "$name ${verbPhrasesElse[rng.nextInt(verbPhrasesElse.size)]}, ${legacyPhrasesElse[rng.nextInt(legacyPhrasesElse.size)]}."
+            }
         }
-        val openingLine = openingLines[rng.nextInt(openingLines.size)]
 
-        // 2. LONGEVITY / STAT-LINE MIDDLE
-        val statLines = listOf(
-            "Across $totalGames appearances, they found the net $totalGoals times and set up $totalAssists more, turning out for $clubsPlayedStr along the way.",
-            "$totalGoals goals and $totalAssists assists over $totalGames matches tell only part of the story of a career spent at $clubsPlayedStr.",
-            "In $totalGames senior matches across spells with $clubsPlayedStr, they amassed $totalGoals goals and $totalAssists assists.",
-            "Representing $clubsPlayedStr, they compiled a total stat line of $totalGoals goals and $totalAssists assists in $totalGames matches."
+        // 2. LONGEVITY / STAT-LINE MIDDLE - Connector + stats + club connector
+        val statOpeners = listOf(
+            "Across",
+            "Over the course of",
+            "Through",
+            "In total across",
+            "Spanning",
+            "Racking up figures across"
         )
-        val statLine = statLines[rng.nextInt(statLines.size)]
+        val clubConnectors = listOf(
+            "while turning out for",
+            "in spells with",
+            "representing",
+            "across stops at",
+            "wearing the shirts of",
+            "over stints with"
+        )
+        val statOpener = statOpeners[rng.nextInt(statOpeners.size)]
+        val clubConn = clubConnectors[rng.nextInt(clubConnectors.size)]
+        val statLine = "$statOpener $totalGames appearances, they found the net $totalGoals times and set up $totalAssists more, $clubConn $clubsPlayedStr."
 
-        // 3. TROPHY / LEGACY CLOSING LINE
+        // 3. TROPHY / LEGACY CLOSING LINE - Framing phrase + sentiment phrase (6 options each)
         val majorTrophies = myTrophies.filter { it.isMajor }
         val topTrophyName = majorTrophies.firstOrNull()?.competitionName
-        val closingLines = when {
-            topTrophyName != null || totalWeight >= 50 -> listOf(
-                "Silverware including ${topTrophyName ?: "major titles"} will forever mark this as a career of substance.",
-                "A glittering trophy cabinet headlined by ${topTrophyName ?: "major trophies"} stands as permanent testament to their success.",
-                "Crowned with honors such as ${topTrophyName ?: "championship titles"}, their mantelpiece reflects a career defined by winning."
-            )
-            myTrophies.isNotEmpty() -> listOf(
-                "With key domestic honors secured along the way, their contribution to team silverware remains memorable.",
-                "Honored with cup triumphs, they ensured their efforts on the pitch translated into tangible silverware.",
-                "Lifting silverware during their career provided memorable highlights for supporters to cherish."
-            )
-            else -> listOf(
-                "Though major silverware proved elusive, their grit, loyalty, and sheer dedication on the pitch earned enduring respect.",
-                "While trophy cabinets don't tell the whole story, their passion and commitment left an indelible mark on every club.",
-                "Beyond trophies and medals, the journey itself and the respect earned from peers defined a career of true integrity."
-            )
+        val closingLine = when {
+            topTrophyName != null || totalWeight >= 50 -> {
+                val framingPhrases = listOf(
+                    "Silverware including ${topTrophyName ?: "major titles"}",
+                    "A glittering trophy cabinet headlined by ${topTrophyName ?: "major trophies"}",
+                    "Crowned with prestigious honors such as ${topTrophyName ?: "championship titles"}",
+                    "With marquee triumphs featuring ${topTrophyName ?: "elite silverware"}",
+                    "A decorated medal collection highlighted by ${topTrophyName ?: "trophy wins"}",
+                    "The defining glory of lifting ${topTrophyName ?: "championship trophies"}"
+                )
+                val sentimentPhrases = listOf(
+                    "will forever mark this as a career of immense substance.",
+                    "stands as permanent testament to their winning pedigree.",
+                    "reflects a career defined by triumph on the biggest stages.",
+                    "cements their reputation as a born champion.",
+                    "ensures their legacy will be celebrated in club lore forever.",
+                    "provides the ultimate crowning achievement to their time on the pitch."
+                )
+                "${framingPhrases[rng.nextInt(framingPhrases.size)]} ${sentimentPhrases[rng.nextInt(sentimentPhrases.size)]}"
+            }
+            myTrophies.isNotEmpty() -> {
+                val framingPhrases = listOf(
+                    "With key domestic honors secured along the way,",
+                    "Honored with hard-fought cup triumphs,",
+                    "Lifting silverware during their career",
+                    "Having guided their side to memorable cup success,",
+                    "Proudly collecting medals over competitive campaigns,",
+                    "Having celebrated triumph on cup final afternoons,"
+                )
+                val sentimentPhrases = listOf(
+                    "their contribution to team silverware remains truly memorable.",
+                    "they ensured their efforts on the pitch translated into tangible glory.",
+                    "provided cherished moments that supporters will long remember.",
+                    "added tangible silverware to validate years of tireless dedication.",
+                    "proved their ability to make an impact when medals were on the line.",
+                    "ensured their name remains etched into club history books."
+                )
+                "${framingPhrases[rng.nextInt(framingPhrases.size)]} ${sentimentPhrases[rng.nextInt(sentimentPhrases.size)]}"
+            }
+            else -> {
+                val framingPhrases = listOf(
+                    "Though major silverware proved elusive,",
+                    "While trophy cabinets don't tell the whole story,",
+                    "Beyond medals and championship titles,",
+                    "Even without the fortune of team silverware,",
+                    "Though fate kept the biggest trophies just out of reach,",
+                    "Looking past the absence of shiny silverware,"
+                )
+                val sentimentPhrases = listOf(
+                    "their grit, loyalty, and sheer dedication on the pitch earned enduring respect.",
+                    "their passion and commitment left an indelible mark on every club.",
+                    "the journey itself and the respect earned from peers defined a career of true integrity.",
+                    "their relentless spirit and devotion to the badge resonated with every supporter.",
+                    "the sheer heart they brought to every single fixture remains unquestioned.",
+                    "they leave the pitch knowing they gave every ounce of themselves to the craft."
+                )
+                "${framingPhrases[rng.nextInt(framingPhrases.size)]} ${sentimentPhrases[rng.nextInt(sentimentPhrases.size)]}"
+            }
         }
-        val closingLine = closingLines[rng.nextInt(closingLines.size)]
 
         return "$openingLine $statLine $closingLine"
     }
@@ -5197,7 +5338,25 @@ private suspend fun adjustClubsReputations(
             "FUN FACT 💡 Did you know? The fastest goal in professional football history was scored in just 2.1 seconds!",
             "FUN FACT 💡 The total distance covered by a professional outfield player during a 90-minute match averages between 10 to 13 kilometers.",
             "FUN FACT 💡 Only three players in football history have won the Champions League with three different clubs.",
-            "FUN FACT 💡 The original World Cup trophy, the Jules Rimet Trophy, was made of gold-plated sterling silver and lapis lazuli."
+            "FUN FACT 💡 The original World Cup trophy, the Jules Rimet Trophy, was made of gold-plated sterling silver and lapis lazuli.",
+            "FUN FACT 💡 The oldest professional football club in the world is Sheffield FC, founded back in 1857!",
+            "FUN FACT 💡 Penalty shootouts were only officially adopted into the Laws of the Game in 1970; before that, tied games were often decided by coin tosses!",
+            "FUN FACT 💡 King Pelé remains the youngest player ever to score in a World Cup final, doing so at just 17 years and 249 days old in 1958.",
+            "FUN FACT 💡 The iconic 32-panel black and white football design (the Telstar) was created in 1970 so television viewers could easily track it on black-and-white screens.",
+            "FUN FACT 💡 A goalkeeper cannot score an own goal directly from a throw-in or goal kick under the official Laws of the Game.",
+            "FUN FACT 💡 The first ever international football match was played between Scotland and England in 1872, finishing in a 0-0 draw.",
+            "FUN FACT 💡 Kazuyoshi Miura, known as 'King Kazu', holds the record as the oldest professional footballer to score in a competitive match, scoring past age 50.",
+            "FUN FACT 💡 The fastest recorded red card in professional football occurred just 2 seconds after kickoff for a reckless challenge.",
+            "FUN FACT 💡 A regulation football pitch is not fixed to one single size; standard dimensions can range between 100 to 110 meters in length and 64 to 75 meters in width.",
+            "FUN FACT 💡 The highest scoring professional match in history finished 149-0 in Madagascar in 2002, when AS Adema's opponents repeatedly scored intentional own goals in protest.",
+            "FUN FACT 💡 Arsenal's 2003-04 'Invincibles' went an entire 38-game Premier League season without a single defeat (26 wins, 12 draws).",
+            "FUN FACT 💡 Red and yellow cards were invented by referee Ken Aston after he was inspired by traffic lights at a London intersection.",
+            "FUN FACT 💡 Over one billion people watched the 2022 FIFA World Cup Final between Argentina and France across the globe.",
+            "FUN FACT 💡 Lionel Messi holds the Guinness World Record for the most official goals scored in a single calendar year, netting 91 goals in 2012.",
+            "FUN FACT 💡 The quickest hat-trick in Premier League history was scored by Sadio Mané in just 2 minutes and 56 seconds in 2015.",
+            "FUN FACT 💡 Real Madrid won the first five editions of the European Cup consecutively between 1956 and 1960.",
+            "FUN FACT 💡 Before modern crossbars were made mandatory in 1882, the top of a football goal was simply marked by a piece of tape or rope between two wooden posts.",
+            "FUN FACT 💡 Goalkeepers were not required to wear a jersey color distinct from their teammates until 1909."
         )
 
         // Calculate maximum allowed player posts for this month based on context tier
@@ -5361,12 +5520,25 @@ private suspend fun adjustClubsReputations(
                                     }
                                 }
                             } else {
-                                val streetTemplates = listOf(
-                                    "@${player.name} from the cages putting in work 👊",
-                                    "Local cage rat ${player.name} bagging braces again — someone's getting scouted soon.",
-                                    "Street report: ${player.name} ($age) running riot in the back alleys.",
-                                    "Cage highlight: ${player.name}'s footwork in the 3v3 tournament was ridiculous 🔥"
+                                val streetOpeners = listOf(
+                                    "Street report:",
+                                    "Local cage rat ${player.name}",
+                                    "Cage highlight:",
+                                    "@${player.name} from the cages",
+                                    "Concrete jungle dispatch:",
+                                    "Asphalt whispers:",
+                                    "Underground tape:"
                                 )
+                                val streetObservations = listOf(
+                                    "putting in serious work on the tarmac 👊",
+                                    "bagging braces again — someone's getting scouted soon.",
+                                    "($age) running riot in the back alleys with effortless style.",
+                                    "showing footwork in the 3v3 tournament that was absolutely ridiculous 🔥",
+                                    "humbling defenders with filthy nutmegs under the floodlights.",
+                                    "leaving local keepers guessing all night long.",
+                                    "turning heads across the neighborhood with unreal street flair."
+                                )
+                                val streetContent = "${streetOpeners[rng.nextInt(streetOpeners.size)]} ${streetObservations[rng.nextInt(streetObservations.size)]}"
                                 SocialPostEntity(
                                     sequenceIndex = currentSeq,
                                     seasonNumber = gameState.currentSeason,
@@ -5375,7 +5547,7 @@ private suspend fun adjustClubsReputations(
                                     authorName = name,
                                     authorHandle = handle,
                                     authorInitials = init,
-                                    content = streetTemplates[rng.nextInt(streetTemplates.size)],
+                                    content = streetContent,
                                     isAboutPlayerOrClub = true,
                                     relatedClubId = null,
                                     likeCount = scaledLikeCount(rng, 50, 800, 0.3f, player)
@@ -5562,11 +5734,25 @@ private suspend fun adjustClubsReputations(
                                             reply3ManagerTrustMod = -1
                                         )
                                     } else {
-                                        val youngTemplates = listOf(
-                                            "Young ${player.name} making strides at $clubName.",
-                                            "${player.name} ($age) earning late substitute minutes.",
-                                            "Developing talent: ${player.name} showing encouraging glimpses of potential."
+                                        val youngOpeners = listOf(
+                                            "Young ${player.name}",
+                                            "Developing talent: ${player.name} ($age)",
+                                            "Prospect alert: ${player.name}",
+                                            "Academy graduate ${player.name}",
+                                            "Rising star ${player.name}",
+                                            "Fresh face ${player.name}",
+                                            "One to watch: ${player.name}"
                                         )
+                                        val youngObservations = listOf(
+                                            "making notable strides at $clubName.",
+                                            "earning valuable late substitute minutes for the first team.",
+                                            "showing encouraging glimpses of raw attacking potential.",
+                                            "impressing the coaching staff during recent training sessions.",
+                                            "turning heads with lively cameos off the bench.",
+                                            "gradually adapting to the pace and physicality of senior football.",
+                                            "proving they belong in the senior squad rotation at $clubName."
+                                        )
+                                        val youngContent = "${youngOpeners[rng.nextInt(youngOpeners.size)]} ${youngObservations[rng.nextInt(youngObservations.size)]}"
                                         SocialPostEntity(
                                             sequenceIndex = currentSeq,
                                             seasonNumber = gameState.currentSeason,
@@ -5575,7 +5761,7 @@ private suspend fun adjustClubsReputations(
                                             authorName = name,
                                             authorHandle = handle,
                                             authorInitials = init,
-                                            content = youngTemplates[rng.nextInt(youngTemplates.size)],
+                                            content = youngContent,
                                             isAboutPlayerOrClub = true,
                                             relatedClubId = club?.id,
                                             likeCount = scaledLikeCount(rng, 1000, 12000, 1.0f, player)
@@ -5647,11 +5833,25 @@ private suspend fun adjustClubsReputations(
                                             reply3MoraleMod = 3
                                         )
                                     } else {
-                                        val veteranTemplates = listOf(
-                                            "The end of an era: ${player.name} ($age) contemplating the final chapter of a legendary career.",
-                                            "Pundit retrospective: ${player.name}'s impact over the years has been immense.",
-                                            "Respect: ${player.name} receiving warm applause from opposing fans across the league."
+                                        val veteranOpeners = listOf(
+                                            "The end of an era:",
+                                            "Pundit retrospective:",
+                                            "Pure class:",
+                                            "Legend status:",
+                                            "Veteran leadership:",
+                                            "Respect across the league:",
+                                            "Golden years:"
                                         )
+                                        val veteranObservations = listOf(
+                                            "${player.name} ($age) contemplating the final chapter of a storied career.",
+                                            "${player.name}'s lasting impact on the pitch over the years has been immense.",
+                                            "${player.name} receiving warm ovations from opposing fans wherever they play.",
+                                            "${player.name} ($age) still demonstrating timeless instincts inside the penalty box.",
+                                            "${player.name} mentoring the next generation while delivering when called upon.",
+                                            "${player.name} showing that experience and football IQ never fade.",
+                                            "supporters cherish every remaining minute of ${player.name}'s masterclasses."
+                                        )
+                                        val veteranContent = "${veteranOpeners[rng.nextInt(veteranOpeners.size)]} ${veteranObservations[rng.nextInt(veteranObservations.size)]}"
                                         SocialPostEntity(
                                             sequenceIndex = currentSeq,
                                             seasonNumber = gameState.currentSeason,
@@ -5660,7 +5860,7 @@ private suspend fun adjustClubsReputations(
                                             authorName = name,
                                             authorHandle = handle,
                                             authorInitials = init,
-                                            content = veteranTemplates[rng.nextInt(veteranTemplates.size)],
+                                            content = veteranContent,
                                             isAboutPlayerOrClub = true,
                                             relatedClubId = club?.id,
                                             likeCount = scaledLikeCount(rng, 5000, 45000, 1.4f, player)

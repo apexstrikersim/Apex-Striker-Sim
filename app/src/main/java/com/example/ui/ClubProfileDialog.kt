@@ -67,6 +67,7 @@ fun ClubProfileDialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
+        ImmersiveDialogEffect()
         Card(
             modifier = Modifier
                 .fillMaxSize()

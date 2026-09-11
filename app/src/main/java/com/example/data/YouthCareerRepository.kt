@@ -126,7 +126,13 @@ object YouthCareerLogic {
         rivalName: String,
         rivalOvr: Int,
         offerIndex: Int = 0,
-        parentReputation: String = "MID"
+        parentReputation: String = "MID",
+        rng: kotlin.random.Random = kotlin.random.Random(
+            offerIndex * 1_000_003L +
+            player.ovr.toLong() * 97L +
+            player.finishing.toLong() * 31L +
+            player.pace.toLong()
+        )
     ): String {
         val stats = listOf(
             "finishing" to player.finishing,
@@ -159,19 +165,74 @@ object YouthCareerLogic {
         val p2 = secondaryPhrases[secondStat] ?: "impressive tactical awareness"
 
         val repHook = when (parentReputation) {
-            "ELITE" -> "As a world-renowned academy setup, they demand immediate high-level performance."
-            "BIG" -> "Their prestigious development program offers a high-profile pathway to senior football."
-            "MID" -> "Their technical staff specializes in polishing tactical growth for first-team readiness."
-            else -> "Their tight-knit environment promises a direct, uninhibited route to senior minutes."
+            "ELITE" -> {
+                val culture = listOf(
+                    "As a world-renowned academy setup,",
+                    "Operating at the absolute pinnacle of youth football,",
+                    "With a globally celebrated tradition of developing superstars,"
+                )[rng.nextInt(3)]
+                val expectation = listOf(
+                    "they demand immediate high-level performance and an elite standard of play.",
+                    "expectations are sky-high, and only the most dedicated prospects survive.",
+                    "they offer unmatched exposure, but competition for minutes is relentless."
+                )[rng.nextInt(3)]
+                "$culture $expectation"
+            }
+            "BIG" -> {
+                val culture = listOf(
+                    "Their prestigious development program",
+                    "Boasting premier facilities and a respected coaching network,",
+                    "With a modern setup built around fast-tracking top talent,"
+                )[rng.nextInt(3)]
+                val expectation = listOf(
+                    "offers a high-profile pathway straight to senior football.",
+                    "provides an exceptional platform to prove yourself against top-tier competition.",
+                    "places huge emphasis on turning promising youth into first-team mainstays."
+                )[rng.nextInt(3)]
+                "$culture $expectation"
+            }
+            "MID" -> {
+                val culture = listOf(
+                    "Their technical staff specializes in polishing tactical growth",
+                    "Known for a patient and structured development philosophy,",
+                    "With a dedicated coaching staff focused on individual mentorship,"
+                )[rng.nextInt(3)]
+                val expectation = listOf(
+                    "they prioritize steady refinement for first-team readiness.",
+                    "they create the ideal proving ground to refine every phase of your game.",
+                    "they offer a proven pathway for determined players to earn early opportunities."
+                )[rng.nextInt(3)]
+                "$culture $expectation"
+            }
+            else -> {
+                val culture = listOf(
+                    "Their tight-knit environment",
+                    "With a passionate grassroots culture,",
+                    "Operating with a close, community-driven coaching ethos,"
+                )[rng.nextInt(3)]
+                val expectation = listOf(
+                    "promises a direct, uninhibited route to senior minutes.",
+                    "ensures you will receive personal attention and immediate responsibility on the pitch.",
+                    "offers the perfect stage to break into the senior squad without delay."
+                )[rng.nextInt(3)]
+                "$culture $expectation"
+            }
         }
 
         val rivalNote = "Current top prospect $rivalName ($rivalOvr OVR) anchors their squad, setting up a competitive duel for the starting shirt."
 
-        return when (offerIndex % 3) {
-            0 -> "Evaluators from $targetName highlighted your $p1 alongside $p2. $repHook $rivalNote"
-            1 -> "A glowing scouting dossier from $targetName praised your $p1. Combined with your $p2, you fit their tactical blueprint perfectly. $repHook $rivalNote"
-            else -> "$targetName scouts attended your recent performances, citing $p1 as a key asset. Paired with your $p2, $repHook $rivalNote"
-        }
+        val templates = listOf(
+            "Evaluators from $targetName highlighted your $p1 alongside $p2. $repHook $rivalNote",
+            "A glowing scouting dossier from $targetName praised your $p1. Combined with your $p2, you fit their tactical blueprint perfectly. $repHook $rivalNote",
+            "$targetName scouts attended your recent performances, citing $p1 as a key asset. Paired with your $p2, $repHook $rivalNote",
+            "$targetName's recruitment team flagged $p1 as the standout trait in your recent tape, with $p2 not far behind. $repHook $rivalNote",
+            "Word from inside $targetName is that scouts cannot stop talking about your $p1. Backed by your $p2, $repHook $rivalNote",
+            "Recent scouting notes from $targetName singled out your $p1 and $p2 as exceptional indicators of future potential. $repHook $rivalNote",
+            "Youth directors at $targetName were thoroughly impressed by your $p1, noting that your $p2 makes you a prime target. $repHook $rivalNote",
+            "An internal briefing at $targetName marked your $p1 as tailor-made for their system, particularly when complemented by your $p2. $repHook $rivalNote"
+        )
+
+        return templates[rng.nextInt(templates.size)]
     }
 
     fun serializeYouthOffers(offers: List<YouthScoutOffer>): String {

@@ -77,6 +77,7 @@ fun YouthScoutOfferDialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
+        ImmersiveDialogEffect()
         Card(
             modifier = Modifier
                 .fillMaxWidth(0.92f)
@@ -319,6 +320,7 @@ fun SeniorScoutOfferDialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
+        ImmersiveDialogEffect()
         Card(
             modifier = Modifier
                 .fillMaxWidth(0.92f)

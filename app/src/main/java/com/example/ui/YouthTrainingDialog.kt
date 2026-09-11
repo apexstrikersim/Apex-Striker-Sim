@@ -102,6 +102,7 @@ fun YouthTrainingDialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
+        ImmersiveDialogEffect()
         val isDrillActive = selectedDrill != null && !drillCompleted
         Card(
             modifier = if (isDrillActive) {

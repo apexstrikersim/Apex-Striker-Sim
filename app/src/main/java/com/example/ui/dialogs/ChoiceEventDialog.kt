@@ -16,6 +16,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.example.data.GameStateEntity
 import com.example.ui.CareerViewModel
+import com.example.ui.ImmersiveDialogEffect
 import com.example.ui.theme.*
 
 @Composable
@@ -27,6 +28,7 @@ fun ChoiceEventDialog(viewModel: CareerViewModel, gameState: GameStateEntity) {
     var isResolving by remember { mutableStateOf(false) }
 
     Dialog(onDismissRequest = { /* Force decision, cannot dismiss */ }) {
+        ImmersiveDialogEffect()
         Card(
             colors = CardDefaults.cardColors(containerColor = SportsCardBg),
             shape = RoundedCornerShape(20.dp),

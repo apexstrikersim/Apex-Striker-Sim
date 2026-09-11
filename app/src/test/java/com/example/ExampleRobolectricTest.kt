@@ -18,4 +18,14 @@ class ExampleRobolectricTest {
     val appName = context.getString(R.string.app_name)
     assertEquals("Apex Striker Career", appName)
   }
+
+  @Test
+  fun `verify demo version and database version`() = kotlinx.coroutines.runBlocking {
+    val context = ApplicationProvider.getApplicationContext<Context>()
+    assertEquals(2, com.example.data.AppVersion.CURRENT)
+    assertEquals("DEMO", com.example.data.AppVersion.DISPLAY)
+    val db = com.example.data.AppDatabase.getDatabase(context, 1)
+    val player = db.careerDao().getPlayerSync()
+    assertEquals(null, player)
+  }
 }

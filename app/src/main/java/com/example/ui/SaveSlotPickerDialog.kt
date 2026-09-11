@@ -41,6 +41,7 @@ fun SaveSlotPickerDialog(
     var refreshKey by remember { mutableIntStateOf(0) }
 
     Dialog(onDismissRequest = onDismiss) {
+        ImmersiveDialogEffect()
         Card(
             colors = CardDefaults.cardColors(containerColor = SportsCardBg),
             shape = RoundedCornerShape(20.dp),

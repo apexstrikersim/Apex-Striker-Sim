@@ -359,6 +359,45 @@ fun HomeTab(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
+                    // ADVANCE BUTTON
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier
+                            .size(130.dp)
+                            .clip(CircleShape)
+                            .background(if (isAdvancing) MutedGrey else PitchGreen)
+                            .clickable(enabled = !isAdvancing) { viewModel.advanceMonth() }
+                            .testTag("advance_button")
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            if (isAdvancing) {
+                                CircularProgressIndicator(color = Color.Black, modifier = Modifier.size(24.dp))
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(
+                                    text = "PLAYING...",
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 12.sp,
+                                    color = Color.Black
+                                )
+                            } else {
+                                Text(
+                                    text = "ADVANCE",
+                                    fontWeight = FontWeight.Black,
+                                    fontSize = 18.sp,
+                                    color = Color.Black
+                                )
+                                Text(
+                                    text = getMonthName(gameState.currentMonthIndex).uppercase(),
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 11.sp,
+                                    color = Color.Black.copy(alpha = 0.7f)
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(4.dp))
+
                     Text(
                         text = "UPCOMING FIXTURES PREVIEW",
                         fontSize = 11.sp,
@@ -435,45 +474,6 @@ fun HomeTab(
                             }
                             if (leftoverLeagueCount > 0) {
                                 Text(text = "+ $leftoverLeagueCount more fixtures", fontSize = 11.sp, color = TextSecondary)
-                            }
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    // ADVANCE BUTTON
-                    Box(
-                        contentAlignment = Alignment.Center,
-                        modifier = Modifier
-                            .size(130.dp)
-                            .clip(CircleShape)
-                            .background(if (isAdvancing) MutedGrey else PitchGreen)
-                            .clickable(enabled = !isAdvancing) { viewModel.advanceMonth() }
-                            .testTag("advance_button")
-                    ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            if (isAdvancing) {
-                                CircularProgressIndicator(color = Color.Black, modifier = Modifier.size(24.dp))
-                                Spacer(modifier = Modifier.height(8.dp))
-                                Text(
-                                    text = "PLAYING...",
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 12.sp,
-                                    color = Color.Black
-                                )
-                            } else {
-                                Text(
-                                    text = "ADVANCE",
-                                    fontWeight = FontWeight.Black,
-                                    fontSize = 18.sp,
-                                    color = Color.Black
-                                )
-                                Text(
-                                    text = getMonthName(gameState.currentMonthIndex).uppercase(),
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 11.sp,
-                                    color = Color.Black.copy(alpha = 0.7f)
-                                )
                             }
                         }
                     }
@@ -787,8 +787,8 @@ private fun EventTimelineCard(event: ParsedCareerEvent) {
                         fontSize = 12.sp,
                         fontWeight = if (event.isMajor) FontWeight.SemiBold else FontWeight.Normal,
                         color = TextPrimary,
-                        maxLines = if (expandedDetails) 10 else 2,
-                        overflow = TextOverflow.Ellipsis,
+                        maxLines = if (expandedDetails) Int.MAX_VALUE else 2,
+                        overflow = if (expandedDetails) TextOverflow.Clip else TextOverflow.Ellipsis,
                         lineHeight = 16.sp
                     )
                 }

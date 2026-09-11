@@ -91,6 +91,7 @@ fun TrophyWinAnimation(
         onDismissRequest = { if (canDismiss) onDismiss() },
         properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
+        ImmersiveDialogEffect()
         Box(
             modifier = Modifier
                 .fillMaxSize()

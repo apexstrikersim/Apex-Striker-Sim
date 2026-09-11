@@ -36,6 +36,7 @@ fun LegalTextDialog(
     }
 
     Dialog(onDismissRequest = onDismiss) {
+        ImmersiveDialogEffect()
         Card(
             colors = CardDefaults.cardColors(containerColor = SportsCardBg),
             shape = RoundedCornerShape(16.dp),

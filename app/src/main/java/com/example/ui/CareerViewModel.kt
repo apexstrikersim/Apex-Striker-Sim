@@ -93,6 +93,9 @@ class CareerViewModel(application: Application) : AndroidViewModel(application) 
     private val _socialPostsFlow = MutableStateFlow<List<com.example.data.SocialPostEntity>>(emptyList())
     val socialPostsFlow: StateFlow<List<com.example.data.SocialPostEntity>> = _socialPostsFlow.asStateFlow()
 
+    private val _latestSeasonSummaryFlow = MutableStateFlow<com.example.data.SeasonSummaryData?>(null)
+    val latestSeasonSummaryFlow: StateFlow<com.example.data.SeasonSummaryData?> = _latestSeasonSummaryFlow.asStateFlow()
+
     private val _isSocialFeedPlayerOnly = MutableStateFlow(false)
     val isSocialFeedPlayerOnly: StateFlow<Boolean> = _isSocialFeedPlayerOnly.asStateFlow()
 
@@ -104,6 +107,7 @@ class CareerViewModel(application: Application) : AndroidViewModel(application) 
 
     private fun reloadStateFromRepository() {
         currentJob?.cancel()
+        _latestSeasonSummaryFlow.value = null
         currentJob = viewModelScope.launch {
             repository.onTrophyUnlockedListener = { trophy -> triggerTrophyAnimation(trophy) }
             repository.migrateClubRecordsIfNeeded()
@@ -119,6 +123,7 @@ class CareerViewModel(application: Application) : AndroidViewModel(application) 
             launch { repository.youthStandingsFlow.collect { _youthStandingsFlow.value = it } }
             launch { repository.youthFixturesFlow.collect { _youthFixturesFlow.value = it } }
             launch { repository.allSocialPostsFlow.collect { _socialPostsFlow.value = it } }
+            launch { repository.latestSeasonSummaryFlow.collect { _latestSeasonSummaryFlow.value = it } }
         }
     }
 
@@ -281,12 +286,6 @@ class CareerViewModel(application: Application) : AndroidViewModel(application) 
             WhistlePlayer.playWhistle(getApplication(), pattern, _audioVolume.value)
         }
     }
-
-    val latestSeasonSummaryFlow: StateFlow<com.example.data.SeasonSummaryData?> = repository.latestSeasonSummaryFlow.stateIn(
-        scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5000),
-        initialValue = null
-    )
 
     fun clearSeasonSummary() {
         viewModelScope.launch {
@@ -459,27 +458,27 @@ class CareerViewModel(application: Application) : AndroidViewModel(application) 
             // Check bonus integer levels
             if (player.finishingTrainingBonus >= 1.0f) {
                 val inc = player.finishingTrainingBonus.toInt()
-                player.finishing = (player.finishing + inc).coerceIn(1, 99)
+                player.finishing = (player.finishing + inc).coerceIn(1, player.potentialCeiling)
                 player.finishingTrainingBonus -= inc
             }
             if (player.passingTrainingBonus >= 1.0f) {
                 val inc = player.passingTrainingBonus.toInt()
-                player.passing = (player.passing + inc).coerceIn(1, 99)
+                player.passing = (player.passing + inc).coerceIn(1, player.potentialCeiling)
                 player.passingTrainingBonus -= inc
             }
             if (player.paceTrainingBonus >= 1.0f) {
                 val inc = player.paceTrainingBonus.toInt()
-                player.pace = (player.pace + inc).coerceIn(1, 99)
+                player.pace = (player.pace + inc).coerceIn(1, player.potentialCeiling)
                 player.paceTrainingBonus -= inc
             }
             if (player.techniqueTrainingBonus >= 1.0f) {
                 val inc = player.techniqueTrainingBonus.toInt()
-                player.technique = (player.technique + inc).coerceIn(1, 99)
+                player.technique = (player.technique + inc).coerceIn(1, player.potentialCeiling)
                 player.techniqueTrainingBonus -= inc
             }
             if (player.physicalTrainingBonus >= 1.0f) {
                 val inc = player.physicalTrainingBonus.toInt()
-                player.physical = (player.physical + inc).coerceIn(1, 99)
+                player.physical = (player.physical + inc).coerceIn(1, player.potentialCeiling)
                 player.physicalTrainingBonus -= inc
             }
             player.ovr = repository.calculateOvr(player.finishing, player.pace, player.passing, player.physical, player.technique).coerceAtMost(player.potentialCeiling)
@@ -682,22 +681,27 @@ class CareerViewModel(application: Application) : AndroidViewModel(application) 
      * Quick Sim the currently active match and show simulated summary
      */
     fun quickSimCurrentMatch() {
+        if (_isAdvancing.value) return
         val fixture = _activeMatch.value ?: return
         val minute = _playerCameOnMinute.value
         viewModelScope.launch {
-            if (minute == null) {
-                val player = playerFlow.value
-                if (player != null) {
-                    val currentMonth = gameStateFlow.value?.currentMonthIndex ?: 0
-                    val rotation = repository.calculateRotationForFixture(fixture, player, currentMonth)
-                    repository.autoSimulateBenchedMatch(fixture, player, rotation)
+            _isAdvancing.value = true
+            try {
+                if (minute == null) {
+                    val player = playerFlow.value
+                    if (player != null) {
+                        val currentMonth = gameStateFlow.value?.currentMonthIndex ?: 0
+                        val rotation = repository.calculateRotationForFixture(fixture, player, currentMonth)
+                        repository.autoSimulateBenchedMatch(fixture, player, rotation)
+                    }
+                } else {
+                    repository.quickSimPlayingMatch(fixture, minute)
                 }
-            } else {
-                repository.quickSimPlayingMatch(fixture, minute)
+                _activeMatch.value = fixture.copy()
+                _isQuickSimCompleted.value = true
+            } finally {
+                _isAdvancing.value = false
             }
-            // Re-assign a copy of fixture to trigger state collection & UI recomposition with new values
-            _activeMatch.value = fixture.copy()
-            _isQuickSimCompleted.value = true
         }
     }
 
@@ -705,6 +709,7 @@ class CareerViewModel(application: Application) : AndroidViewModel(application) 
      * Dismiss the quick sim summary screen and proceed to next matches
      */
     fun dismissQuickSimSummary() {
+        if (_isAdvancing.value) return
         _activeScreen.value = Screen.GAMEPLAY
         _activeMatch.value = null
         _playerCameOnMinute.value = null
@@ -725,33 +730,39 @@ class CareerViewModel(application: Application) : AndroidViewModel(application) 
         goalMinutes: String? = null,
         assistMinutes: String? = null
     ) {
+        if (_isAdvancing.value) return
         val fixture = _activeMatch.value ?: return
         val minute = _playerCameOnMinute.value
         viewModelScope.launch {
-            if (minute == null) {
-                val player = playerFlow.value
-                if (player != null) {
-                    val currentMonth = gameStateFlow.value?.currentMonthIndex ?: 0
-                    val rotation = repository.calculateRotationForFixture(fixture, player, currentMonth)
-                    repository.autoSimulateBenchedMatch(fixture, player, rotation)
+            _isAdvancing.value = true
+            try {
+                if (minute == null) {
+                    val player = playerFlow.value
+                    if (player != null) {
+                        val currentMonth = gameStateFlow.value?.currentMonthIndex ?: 0
+                        val rotation = repository.calculateRotationForFixture(fixture, player, currentMonth)
+                        repository.autoSimulateBenchedMatch(fixture, player, rotation)
+                    }
+                } else {
+                    repository.resolvePlayedMatch(
+                        fixture,
+                        minute,
+                        playerGoals,
+                        playerAssists,
+                        finalHomeScore,
+                        finalAwayScore,
+                        minutesPlayed,
+                        matchRating,
+                        goalMinutes,
+                        assistMinutes
+                    )
                 }
-            } else {
-                repository.resolvePlayedMatch(
-                    fixture,
-                    minute,
-                    playerGoals,
-                    playerAssists,
-                    finalHomeScore,
-                    finalAwayScore,
-                    minutesPlayed,
-                    matchRating,
-                    goalMinutes,
-                    assistMinutes
-                )
+                _activeScreen.value = Screen.GAMEPLAY
+                _activeMatch.value = null
+                _playerCameOnMinute.value = null
+            } finally {
+                _isAdvancing.value = false
             }
-            _activeScreen.value = Screen.GAMEPLAY
-            _activeMatch.value = null
-            _playerCameOnMinute.value = null
             // Check if there are more matches in the month
             advanceMonth()
         }

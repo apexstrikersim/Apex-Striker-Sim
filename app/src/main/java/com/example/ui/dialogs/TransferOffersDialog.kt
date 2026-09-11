@@ -37,6 +37,7 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.data.TransferOffer
 import com.example.ui.CareerViewModel
+import com.example.ui.ImmersiveDialogEffect
 import com.example.ui.theme.*
 import kotlinx.coroutines.launch
 
@@ -46,6 +47,7 @@ fun TransferOffersDialog(viewModel: CareerViewModel) {
     var offerBeingReviewed by remember { mutableStateOf<TransferOffer?>(null) }
 
     Dialog(onDismissRequest = { viewModel.dismissTransferDialog() }) {
+        ImmersiveDialogEffect()
         Card(
             colors = CardDefaults.cardColors(containerColor = SportsCardBg),
             shape = RoundedCornerShape(20.dp),
@@ -166,6 +168,7 @@ fun ContractSigningDialog(
         onDismissRequest = { if (!isSigning) onReject() },
         properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
+        ImmersiveDialogEffect()
         Box(
             modifier = Modifier
                 .fillMaxWidth(0.94f)

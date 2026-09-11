@@ -123,7 +123,8 @@ fun MatchScreen(viewModel: CareerViewModel) {
             myClub = myClub,
             oppClub = oppClub,
             fixture = fixture,
-            onContinue = { viewModel.dismissQuickSimSummary() }
+            onContinue = { viewModel.dismissQuickSimSummary() },
+            isAdvancing = viewModel.isAdvancing.collectAsStateWithLifecycle().value
         )
     } else {
         var matchPhase by remember { mutableStateOf(MatchPhase.PRE_MATCH) }
@@ -148,6 +149,7 @@ fun MatchScreen(viewModel: CareerViewModel) {
                     oppClub = oppClub,
                     fixture = fixture,
                     playerCameOnMinute = playerCameOnMinute,
+                    isAdvancing = viewModel.isAdvancing.collectAsStateWithLifecycle().value,
                     onMatchFinished = { goals, assists, homeFinal, awayFinal, minutesPlayed, matchRating, goalMinutes, assistMinutes ->
                         viewModel.resolvePlayedMatch(goals, assists, homeFinal, awayFinal, minutesPlayed, matchRating, goalMinutes, assistMinutes)
                     }
@@ -629,6 +631,7 @@ fun LiveMatchSimulation(
     oppClub: ClubEntity,
     fixture: FixtureEntity,
     playerCameOnMinute: Int?,
+    isAdvancing: Boolean = false,
     onMatchFinished: (goals: Int, assists: Int, homeFinal: Int, awayFinal: Int, minutesPlayed: Int, matchRating: Float, goalMinutes: String?, assistMinutes: String?) -> Unit
 ) {
     val coroutineScope = rememberCoroutineScope()
@@ -2598,6 +2601,7 @@ fun LiveMatchSimulation(
                             val aMin = if (playerAssistMinutes.isNotEmpty()) playerAssistMinutes.sorted().joinToString(",") else null
                             onMatchFinished(playerGoalsScored, playerAssistsByMe, runningHomeScore, runningAwayScore, minutesPlayed, finalRating, gMin, aMin)
                         },
+                        enabled = !isAdvancing,
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(52.dp)
@@ -2624,7 +2628,8 @@ fun SimulatedMatchSummaryScreen(
     myClub: ClubEntity,
     oppClub: ClubEntity,
     fixture: FixtureEntity,
-    onContinue: () -> Unit
+    onContinue: () -> Unit,
+    isAdvancing: Boolean = false
 ) {
     val isHome = fixture.homeClubId == player.currentClubId
     val homeScore = fixture.homeScore ?: 0
@@ -2788,6 +2793,7 @@ fun SimulatedMatchSummaryScreen(
 
             Button(
                 onClick = onContinue,
+                enabled = !isAdvancing,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(52.dp)

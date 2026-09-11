@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.example.data.SeasonSummaryData
 import com.example.data.formatSeasonYear
+import com.example.ui.ImmersiveDialogEffect
 import com.example.ui.theme.*
 import kotlinx.coroutines.launch
 
@@ -87,6 +88,7 @@ fun SeasonSummaryDialog(
     )
 
     Dialog(onDismissRequest = onDismiss) {
+        ImmersiveDialogEffect()
         Surface(
             shape = RoundedCornerShape(24.dp),
             color = SportsCardBg,
