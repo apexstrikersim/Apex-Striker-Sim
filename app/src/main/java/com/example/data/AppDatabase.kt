@@ -407,16 +407,12 @@ abstract class AppDatabase : RoomDatabase() {
         private var INSTANCE: AppDatabase? = null
 
         private val instances = mutableMapOf<Int, AppDatabase>()
-        private val checkedSlots = mutableSetOf<Int>()
 
         fun getDatabase(context: Context, slotId: Int = 1): AppDatabase {
             return synchronized(this) {
                 instances[slotId]?.let { return it }
 
                 SaveSlotManager(context).migrateLegacyDatabaseIfNeeded(context)
-                if (checkedSlots.add(slotId)) {
-                    reconcileStaleDatabaseIfNeeded(context, slotId)
-                }
 
                 val db = Room.databaseBuilder(
                     context.applicationContext,
@@ -438,37 +434,7 @@ abstract class AppDatabase : RoomDatabase() {
                 try {
                     instances.remove(slotId)?.close()
                 } catch (_: Exception) {}
-                checkedSlots.remove(slotId)
             }
-        }
-
-        private fun reconcileStaleDatabaseIfNeeded(context: Context, slotId: Int) {
-            try {
-                val dbFile = context.getDatabasePath("apex_career_slot_$slotId.db")
-                if (dbFile.exists()) {
-                    var diskHash: String? = null
-                    try {
-                        val sqlite = android.database.sqlite.SQLiteDatabase.openDatabase(
-                            dbFile.path,
-                            null,
-                            android.database.sqlite.SQLiteDatabase.OPEN_READONLY
-                        )
-                        try {
-                            sqlite.rawQuery("SELECT identity_hash FROM room_master_table WHERE id = 42 LIMIT 1", null).use { cursor ->
-                                if (cursor.moveToFirst()) {
-                                    diskHash = cursor.getString(0)
-                                }
-                            }
-                        } finally {
-                            sqlite.close()
-                        }
-                    } catch (_: Exception) {}
-
-                    if (diskHash != null && diskHash != "234fa13c6a3b0fa3daae99f15a646e47") {
-                        context.deleteDatabase("apex_career_slot_$slotId.db")
-                    }
-                }
-            } catch (_: Exception) {}
         }
     }
 }

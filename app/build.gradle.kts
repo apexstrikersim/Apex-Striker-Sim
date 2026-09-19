@@ -22,16 +22,32 @@ android {
   signingConfigs {
     create("release") {
       val keystorePath = System.getenv("KEYSTORE_PATH") ?: "${rootDir}/my-upload-key.jks"
-      storeFile = file(keystorePath)
-      storePassword = System.getenv("STORE_PASSWORD")
-      keyAlias = "upload"
-      keyPassword = System.getenv("KEY_PASSWORD")
+      val keystoreFile = file(keystorePath)
+      val isBuildingRelease = gradle.startParameter.taskNames.any { it.contains("release", ignoreCase = true) }
+      if (keystoreFile.exists()) {
+        storeFile = keystoreFile
+        storePassword = System.getenv("STORE_PASSWORD")
+          ?: throw GradleException("STORE_PASSWORD environment variable is not set. Required for release signing.")
+        keyAlias = "upload"
+        keyPassword = System.getenv("KEY_PASSWORD")
+          ?: throw GradleException("KEY_PASSWORD environment variable is not set. Required for release signing.")
+      } else if (isBuildingRelease) {
+        throw GradleException(
+          "Release keystore not found at $keystorePath. " +
+          "Set the KEYSTORE_PATH environment variable to point to your upload keystore, " +
+          "or place it at ${rootDir}/my-upload-key.jks. " +
+          "This is only required when building the 'release' variant — debug builds are unaffected."
+        )
+      }
     }
     create("debugConfig") {
-      storeFile = file("${rootDir}/debug.keystore")
-      storePassword = "android"
-      keyAlias = "androiddebugkey"
-      keyPassword = "android"
+      val customDebugKeystore = file("${rootDir}/debug.keystore")
+      if (customDebugKeystore.exists()) {
+        storeFile = customDebugKeystore
+        storePassword = "android"
+        keyAlias = "androiddebugkey"
+        keyPassword = "android"
+      }
     }
   }
 
