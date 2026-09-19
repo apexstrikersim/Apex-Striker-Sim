@@ -50,20 +50,20 @@ fun CalendarTab(viewModel: CareerViewModel) {
 
     var selectedMonthIndex by remember(currentMonthIndex) { mutableStateOf(currentMonthIndex) }
 
-    val monthAbbreviations = listOf("AUG", "SEP", "OCT", "NOV", "DEC", "JAN", "FEB", "MAR", "APR", "MAY")
-    val daysInMonth = remember { listOf(31, 30, 31, 30, 31, 31, 28, 31, 30, 31) }
-    val totalDays = daysInMonth[selectedMonthIndex]
+    val monthAbbreviations = listOf("AUG", "SEP", "OCT", "NOV", "DEC", "JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL")
+    val daysInMonth = remember { listOf(31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31) }
+    val totalDays = daysInMonth.getOrElse(selectedMonthIndex) { 30 }
 
     val monthStartOffsets = remember(daysInMonth) {
-        val offsets = IntArray(10)
+        val offsets = IntArray(12)
         var currentOffset = 5 // August 1st starts on Saturday (0=Mon, 5=Sat)
-        for (i in 0 until 10) {
+        for (i in 0 until 12) {
             offsets[i] = currentOffset
             currentOffset = (currentOffset + daysInMonth[i]) % 7
         }
         offsets
     }
-    val firstWeekdayOffset = monthStartOffsets[selectedMonthIndex]
+    val firstWeekdayOffset = monthStartOffsets.getOrElse(selectedMonthIndex) { 0 }
     val currentSeason = gameStateState?.currentSeason ?: 1
     val seasonYearDisplay = formatSeasonYear(currentSeason)
 
@@ -121,7 +121,7 @@ fun CalendarTab(viewModel: CareerViewModel) {
                         change.consume()
                         totalDrag += dragAmount
                         if (!hasNavigated) {
-                            if (totalDrag < -50f && selectedMonthIndex < 9) {
+                            if (totalDrag < -50f && selectedMonthIndex < monthAbbreviations.lastIndex) {
                                 selectedMonthIndex++
                                 hasNavigated = true
                             } else if (totalDrag > 50f && selectedMonthIndex > 0) {

@@ -63,6 +63,7 @@ class SaveSlotManager(context: Context) {
             .remove("slot_${slotId}_timestamp")
             .apply()
         try {
+            AppDatabase.closeDatabase(slotId)
             context?.deleteDatabase("apex_career_slot_$slotId.db")
         } catch (e: Exception) {
             e.printStackTrace()

@@ -32,6 +32,15 @@ fun MainGameScreen(viewModel: CareerViewModel) {
     val selectedTab by viewModel.selectedTab.collectAsStateWithLifecycle()
     val isSimulatingSeason by viewModel.isSimulatingSeason.collectAsStateWithLifecycle()
     val isAdvancing by viewModel.isAdvancing.collectAsStateWithLifecycle()
+    val snackbarMessage by viewModel.snackbarMessage.collectAsStateWithLifecycle()
+    val context = androidx.compose.ui.platform.LocalContext.current
+
+    LaunchedEffect(snackbarMessage) {
+        snackbarMessage?.let { msg ->
+            android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_LONG).show()
+            viewModel.clearSnackbarMessage()
+        }
+    }
 
     Box(
         modifier = Modifier

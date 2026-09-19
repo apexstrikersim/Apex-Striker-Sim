@@ -370,6 +370,7 @@ class CareerRepository(private val context: Context, val slotId: Int = 1) {
             }
 
             val potentialCeiling = computePotentialCeiling(generation, statBoost, achievementRatio)
+            val skillCeilings = computeSkillCeilings(potentialCeiling)
 
             val talentSeed = 0.90f + Random.nextFloat() * 0.25f // 0.9 to 1.15
             val minStat = 20 + statBoost
@@ -415,6 +416,11 @@ class CareerRepository(private val context: Context, val slotId: Int = 1) {
                 generation = generation,
                 peakOvr = ovr,
                 potentialCeiling = potentialCeiling,
+                finishingCeiling = skillCeilings.getValue("finishing"),
+                paceCeiling = skillCeilings.getValue("pace"),
+                passingCeiling = skillCeilings.getValue("passing"),
+                physicalCeiling = skillCeilings.getValue("physical"),
+                techniqueCeiling = skillCeilings.getValue("technique"),
                 careerPhase = PHASE_STREET,
                 preferredFoot = preferredFoot,
                 squadNumber = squadNumber,
@@ -541,6 +547,19 @@ class CareerRepository(private val context: Context, val slotId: Int = 1) {
         val achievementPenalty = shortfall * 8f
 
         return (baseCeiling + legacyNudge - achievementPenalty).roundToInt().coerceIn(60, 99)
+    }
+
+    fun computeSkillCeilings(potentialCeiling: Int): Map<String, Int> {
+        // Each skill's ceiling varies ±(0-6) around the composite potentialCeiling,
+        // independently rolled per skill, so skills don't all cap identically.
+        fun rolled() = (potentialCeiling + Random.nextInt(-6, 7)).coerceIn(30, 99)
+        return mapOf(
+            "finishing" to rolled(),
+            "pace" to rolled(),
+            "passing" to rolled(),
+            "physical" to rolled(),
+            "technique" to rolled()
+        )
     }
 
     /**
@@ -1004,7 +1023,7 @@ class CareerRepository(private val context: Context, val slotId: Int = 1) {
                 }
 
                 val nextMonth = currentMonth + 1
-                if (nextMonth <= 9) {
+                if (nextMonth <= 11) {
                     gameState.currentMonthIndex = nextMonth
                 } else {
                     checkAndAwardYouthTrophy(player, gameState)
@@ -1068,7 +1087,7 @@ class CareerRepository(private val context: Context, val slotId: Int = 1) {
                 }
 
                 val nextMonth = currentMonth + 1
-                if (nextMonth <= 9) {
+                if (nextMonth <= 11) {
                     gameState.currentMonthIndex = nextMonth
                 } else {
                     checkAndAwardYouthTrophy(player, gameState)
@@ -1437,16 +1456,46 @@ class CareerRepository(private val context: Context, val slotId: Int = 1) {
                 // Clear persisted transfer offers since we are leaving the current month
                 gameState.persistedTransferOffers = null
 
-                if (nextMonth <= 9) {
+                if (nextMonth <= 11) {
                     gameState.currentMonthIndex = nextMonth
-                    if (nextMonth == 5) {
+                    if (nextMonth == 0 || nextMonth == 5 || nextMonth == 10 || nextMonth == 11) {
                         player.hasTransferredThisWindow = false
                         dao.updatePlayer(player)
+                    }
+
+                    // In Month 10 (June): International Duty / World Cup / Call-up evaluation
+                    if (nextMonth == 10 && player.careerPhase == PHASE_SENIOR) {
+                        if (player.nationalTeamCode != null) {
+                            val myNation = nationByCode(player.nationalTeamCode!!)
+                            val isWC = isWorldCupSeason(gameState.currentSeason)
+                            val thresholds = myNation?.let { thresholdsForTier(it.tier) }
+                            val avgRating = recentRatingAverage(player.recentMatchRatings)
+                            val requiredRating = if (isWC) thresholds?.worldCupRating else thresholds?.baseRating
+                            val selected = thresholds != null && avgRating != null && requiredRating != null &&
+                                    player.ovr >= thresholds.baseOvr && avgRating >= requiredRating
+                            if (selected) {
+                                val capsEarned = if (isWC) Random.nextInt(3, 6) else Random.nextInt(2, 4)
+                                player.nationalTeamCaps += capsEarned
+                                player.lastNationalCallUpSeason = gameState.currentSeason
+                                dao.updatePlayer(player)
+                                val dutyName = if (isWC) "FIFA World Cup" else "International fixtures"
+                                monthLogs.add("🌍 International Duty: Represented ${myNation.name} in $dutyName (+$capsEarned caps). Total caps: ${player.nationalTeamCaps}.")
+                            } else {
+                                monthLogs.add("🌍 International Duty: Left out of ${myNation?.name ?: player.nationalTeamCode}'s squad this cycle — form/OVR below the required standard.")
+                            }
+                        } else {
+                            val callUpOffer = evaluateNationalCallUp(player, gameState)
+                            if (callUpOffer != null) {
+                                gameState.pendingCallUpNationCode = callUpOffer.code
+                                gameState.pendingCallUpIsWorldCup = isWorldCupSeason(gameState.currentSeason)
+                                monthLogs.add("🌍 NATIONAL CALL-UP: You have received a senior call-up to represent ${callUpOffer.name}!")
+                            }
+                        }
                     }
                     dao.updateGameState(gameState)
                 } else {
                     // END OF SEASON TRIGGERS!
-                    // Month is May (9), advance season
+                    // Month is July (11), advance season to August (0)
                     checkAndAwardYouthTrophy(player, gameState)
                     resetYouthLeagueForNewSeason()
                     player.age += 1
@@ -1769,14 +1818,8 @@ class CareerRepository(private val context: Context, val slotId: Int = 1) {
     }
 
     private suspend fun safeInsertTrophy(trophy: TrophyEntity) {
-        val existing = dao.getAllTrophiesSync()
-        val alreadyAwarded = existing.any {
-            it.playerName == trophy.playerName &&
-            it.generation == trophy.generation &&
-            it.seasonYear == trophy.seasonYear &&
-            it.competitionName == trophy.competitionName
-        }
-        if (!alreadyAwarded) {
+        val existing = dao.findTrophy(trophy.playerName, trophy.generation, trophy.seasonYear, trophy.competitionName)
+        if (existing == null) {
             dao.insertTrophy(trophy)
             onTrophyUnlockedListener?.invoke(trophy)
         }
@@ -1787,7 +1830,7 @@ class CareerRepository(private val context: Context, val slotId: Int = 1) {
      */
     private suspend fun handleEndOfSeason(player: PlayerEntity, gameState: GameStateEntity): String {
         // 1. Recalculate standings directly from this season's league fixtures to guarantee absolute score/points consistency
-        val seasonFixtures = dao.getAllFixturesSync().filter { it.competition == "LEAGUE" && it.isSimulated }
+        val seasonFixtures = dao.getSeasonLeagueFixturesSync()
         val allStandings = dao.getAllStandingsSync()
         
         for (st in allStandings) {
@@ -2032,9 +2075,44 @@ class CareerRepository(private val context: Context, val slotId: Int = 1) {
         evaluateContractEndSeason(player, myClub, seasonLogs, gameState.currentSeason)
 
         // --- Club Records & Season History Snapshotting ---
-        val currentClub = allClubsMap[player.currentClubId]
-        if (currentClub != null) {
-            checkAndApplyPlayerClubRecords(player, currentClub, gameState.currentSeason)
+        if (player.careerPhase == PHASE_SENIOR) {
+            val currentClub = allClubsMap[player.currentClubId]
+            if (currentClub != null) {
+                checkAndApplyPlayerClubRecords(player, currentClub, gameState.currentSeason)
+                val clubNationCode = nationCodeForCountryName(currentClub.country)
+                if (clubNationCode != null) {
+                    val residencyMap = parseResidencyMap(player.residencyDaysByCountry).toMutableMap()
+                    residencyMap[clubNationCode] = (residencyMap[clubNationCode] ?: 0) + 365
+                    player.residencyDaysByCountry = serializeResidencyMap(residencyMap)
+                }
+            }
+        } else if (player.careerPhase == PHASE_YOUTH && player.currentAcademyId != null) {
+            val academy = dao.getYouthAcademyById(player.currentAcademyId!!)
+            if (academy != null) {
+                val academyNationCode = nationCodeForCountryName(academy.country)
+                if (academyNationCode != null) {
+                    val residencyMap = parseResidencyMap(player.residencyDaysByCountry).toMutableMap()
+                    residencyMap[academyNationCode] = (residencyMap[academyNationCode] ?: 0) + 365
+                    player.residencyDaysByCountry = serializeResidencyMap(residencyMap)
+                }
+            }
+        }
+
+        // Simulate global national team ranking fluctuations once per season
+        updateNationRankings(player, gameState.currentSeason)
+
+        if (isWorldCupSeason(gameState.currentSeason)) {
+            val existing = gameState.worldCupWinnersHistory.split(";").filter { it.isNotBlank() }
+            val alreadyRecorded = existing.any { it.startsWith("${gameState.currentSeason}:") }
+            if (!alreadyRecorded) {
+                val rankings = dao.getAllRankingStateSync()
+                val winnerCode = rankings.maxByOrNull { it.currentRankingPoints }?.nationCode
+                    ?: ALL_NATIONS.maxByOrNull { it.baseRankingPoints }?.code
+                    ?: "BRA"
+                val newEntry = "${gameState.currentSeason}:$winnerCode"
+                gameState.worldCupWinnersHistory = if (gameState.worldCupWinnersHistory.isBlank()) newEntry else "${gameState.worldCupWinnersHistory};$newEntry"
+                dao.updateGameState(gameState)
+            }
         }
 
         for (club in allClubs) {
@@ -2501,11 +2579,11 @@ private suspend fun adjustClubsReputations(
             val assistBonus = player.seasonAssists / 14f
             val mvpBonus = if (player.seasonMvps > 5) 1.0f else 0.0f
 
-            player.finishing = applyStatGrowth(player.finishing, baseFinishingGrowth + goalBonus + mvpBonus + player.finishingTrainingBonus, player.potentialCeiling)
-            player.pace = applyStatGrowth(player.pace, basePaceGrowth + mvpBonus + player.paceTrainingBonus, player.potentialCeiling)
-            player.passing = applyStatGrowth(player.passing, basePassingGrowth + assistBonus + mvpBonus + player.passingTrainingBonus, player.potentialCeiling)
-            player.physical = applyStatGrowth(player.physical, basePhysicalGrowth + mvpBonus + player.physicalTrainingBonus, player.potentialCeiling)
-            player.technique = applyStatGrowth(player.technique, baseTechniqueGrowth + mvpBonus + player.techniqueTrainingBonus, player.potentialCeiling)
+            player.finishing = applyStatGrowth(player.finishing, baseFinishingGrowth + goalBonus + mvpBonus + player.finishingTrainingBonus, player.finishingCeiling)
+            player.pace = applyStatGrowth(player.pace, basePaceGrowth + mvpBonus + player.paceTrainingBonus, player.paceCeiling)
+            player.passing = applyStatGrowth(player.passing, basePassingGrowth + assistBonus + mvpBonus + player.passingTrainingBonus, player.passingCeiling)
+            player.physical = applyStatGrowth(player.physical, basePhysicalGrowth + mvpBonus + player.physicalTrainingBonus, player.physicalCeiling)
+            player.technique = applyStatGrowth(player.technique, baseTechniqueGrowth + mvpBonus + player.techniqueTrainingBonus, player.techniqueCeiling)
         } else {
             // Decline Curve System (30+)
             val declineBase = when {
@@ -2524,11 +2602,11 @@ private suspend fun adjustClubsReputations(
 
             val netDecline = (declineBase + declineOffset).coerceAtMost(0.0f) // always decline or flat
 
-            player.finishing = (player.finishing + netDecline.roundToInt() + player.finishingTrainingBonus.roundToInt()).coerceIn(1, player.potentialCeiling)
-            player.pace = (player.pace + netDecline.roundToInt() + player.paceTrainingBonus.roundToInt()).coerceIn(1, player.potentialCeiling)
-            player.passing = (player.passing + netDecline.roundToInt() + player.passingTrainingBonus.roundToInt()).coerceIn(1, player.potentialCeiling)
-            player.physical = (player.physical + netDecline.roundToInt() + player.physicalTrainingBonus.roundToInt()).coerceIn(1, player.potentialCeiling)
-            player.technique = (player.technique + netDecline.roundToInt() + player.techniqueTrainingBonus.roundToInt()).coerceIn(1, player.potentialCeiling)
+            player.finishing = (player.finishing + netDecline.roundToInt() + player.finishingTrainingBonus.roundToInt()).coerceIn(1, player.finishingCeiling)
+            player.pace = (player.pace + netDecline.roundToInt() + player.paceTrainingBonus.roundToInt()).coerceIn(1, player.paceCeiling)
+            player.passing = (player.passing + netDecline.roundToInt() + player.passingTrainingBonus.roundToInt()).coerceIn(1, player.passingCeiling)
+            player.physical = (player.physical + netDecline.roundToInt() + player.physicalTrainingBonus.roundToInt()).coerceIn(1, player.physicalCeiling)
+            player.technique = (player.technique + netDecline.roundToInt() + player.techniqueTrainingBonus.roundToInt()).coerceIn(1, player.techniqueCeiling)
         }
 
         player.ovr = calculateOvr(player.finishing, player.pace, player.passing, player.physical, player.technique).coerceAtMost(player.potentialCeiling)
@@ -2658,7 +2736,86 @@ private suspend fun adjustClubsReputations(
     }
 
     fun isTransferWindowOpen(monthIndex: Int): Boolean {
-        return monthIndex == 0 || monthIndex == 5
+        // 0=Aug, 5=Jan (existing windows, unchanged) — 10=Jun, 11=Jul (new windows)
+        return monthIndex == 0 || monthIndex == 5 || monthIndex == 10 || monthIndex == 11
+    }
+
+    private fun pushRecentRating(current: String, newRating: Float): String {
+        val list = if (current.isBlank()) emptyList() else current.split(";").mapNotNull { it.toFloatOrNull() }
+        val updated = (list + newRating).takeLast(5)
+        return updated.joinToString(";") { "%.2f".format(it) }
+    }
+
+    fun recentRatingAverage(recentMatchRatings: String): Float? {
+        val list = if (recentMatchRatings.isBlank()) emptyList() else recentMatchRatings.split(";").mapNotNull { it.toFloatOrNull() }
+        return if (list.isEmpty()) null else list.average().toFloat()
+    }
+
+    fun getEligibleNationCodes(player: PlayerEntity): List<String> {
+        val result = mutableSetOf<String>()
+        nationCodeForCountryName(player.birthCountry)?.let { result.add(it) }
+        val residencyMap = parseResidencyMap(player.residencyDaysByCountry)
+        val fiveYearsInDays = 365 * 5
+        residencyMap.forEach { (code, days) ->
+            if (days >= fiveYearsInDays && player.age < 21) result.add(code)
+            else if (days >= fiveYearsInDays && result.contains(code)) {
+                // already eligible via birth country; residency simply reconfirms it
+            }
+        }
+        return result.toList()
+    }
+
+    fun getEligibleNationCodesIncludingInheritance(player: PlayerEntity, fatherNationalTeamCode: String?): List<String> {
+        val own = getEligibleNationCodes(player)
+        return if (fatherNationalTeamCode != null) (own + fatherNationalTeamCode).distinct() else own
+    }
+
+    suspend fun updateNationRankings(player: PlayerEntity, seasonNumber: Int) {
+        val existingState = dao.getAllRankingStateSync().associateBy { it.nationCode }
+
+        fun currentPointsFor(code: String): Int =
+            existingState[code]?.currentRankingPoints ?: (nationByCode(code)?.baseRankingPoints ?: 0)
+
+        val sortedByCurrent = ALL_NATIONS.sortedByDescending { currentPointsFor(it.code) }
+        val topSimSet = sortedByCurrent.take(18).map { it.code }.toMutableSet()
+        val committedNationCode = player.nationalTeamCode
+        if (committedNationCode != null) topSimSet.add(committedNationCode)
+
+        val updates = mutableListOf<NationRankingState>()
+
+        for (nation in ALL_NATIONS) {
+            val current = currentPointsFor(nation.code)
+            if (nation.code in topSimSet) {
+                val baseComponent = nation.baseRankingPoints * 0.7f
+                val playerComponent = if (nation.code == committedNationCode) {
+                    val avgRating = recentRatingAverage(player.recentMatchRatings)
+                    val ovrContribution = (player.ovr - 60).coerceIn(0, 40) * 1.5f
+                    val ratingContribution = if (avgRating != null) (avgRating - 5.0f).coerceIn(0f, 5f) * 12f else 0f
+                    (ovrContribution + ratingContribution).coerceAtMost(120f) // hard cap: one player, max +120 pts total, not per season unbounded
+                } else 0f
+                val drift = (-15..15).random()
+                val newPoints = (baseComponent + current * 0.3f + playerComponent + drift).toInt().coerceIn(200, 2200)
+                updates.add(NationRankingState(nation.code, newPoints, seasonNumber))
+            } else {
+                val drift = (-40..40).random()
+                val newPoints = (current + drift).coerceIn(nation.baseRankingPoints - 200, nation.baseRankingPoints + 200).coerceIn(200, 2200)
+                updates.add(NationRankingState(nation.code, newPoints, existingState[nation.code]?.lastFullSimSeason ?: 0))
+            }
+        }
+
+        dao.upsertRankingStates(updates)
+    }
+
+    private fun parseResidencyMap(raw: String): Map<String, Int> {
+        if (raw.isBlank()) return emptyMap()
+        return raw.split(";").mapNotNull {
+            val parts = it.split(":")
+            if (parts.size == 2) parts[0] to (parts[1].toIntOrNull() ?: 0) else null
+        }.toMap()
+    }
+
+    private fun serializeResidencyMap(map: Map<String, Int>): String {
+        return map.entries.joinToString(";") { "${it.key}:${it.value}" }
     }
 
     private fun serializeOffers(offers: List<TransferOffer>): String {
@@ -2867,7 +3024,8 @@ private suspend fun adjustClubsReputations(
                 isCompleted = true,
                 retirementDescription = retirementDesc,
                 faceDescriptor = player.faceDescriptor,
-                finalAge = player.age
+                finalAge = player.age,
+                nationalTeamCode = player.nationalTeamCode
             )
             dao.insertLegacy(legacy)
 
@@ -3206,7 +3364,7 @@ private suspend fun adjustClubsReputations(
             safetyCounter++
             val player = dao.getPlayerSync() ?: break
             val gs0 = dao.getGameStateSync() ?: break
-            if (player.isRetired || (player.age >= 41 && !player.isGodMode) || gs0.youthCareerEnded) break
+            if (player.isRetired || (player.age >= 41 && !player.isGodMode) || gs0.youthCareerEnded || gs0.pendingCallUpNationCode != null) break
 
             var gs = gs0
             var resolveAttempts = 0
@@ -3233,7 +3391,7 @@ private suspend fun adjustClubsReputations(
             yield()
 
             val updatedGs = dao.getGameStateSync() ?: break
-            if (updatedGs.youthCareerEnded) break
+            if (updatedGs.youthCareerEnded || updatedGs.pendingCallUpNationCode != null) break
             currentSeason = updatedGs.currentSeason
         }
     }
@@ -3245,13 +3403,13 @@ private suspend fun adjustClubsReputations(
         for (i in 0 until count) {
             val player = dao.getPlayerSync() ?: break
             val gs = dao.getGameStateSync()
-            if (player.isRetired || (player.age >= 41 && !player.isGodMode) || gs?.youthCareerEnded == true) break
+            if (player.isRetired || (player.age >= 41 && !player.isGodMode) || gs?.youthCareerEnded == true || gs?.pendingCallUpNationCode != null) break
 
             devSimulateFullSeason()
 
             val updatedPlayer = dao.getPlayerSync() ?: break
             val updatedGs = dao.getGameStateSync()
-            if (updatedPlayer.isRetired || (updatedPlayer.age >= 41 && !updatedPlayer.isGodMode) || updatedGs?.youthCareerEnded == true) break
+            if (updatedPlayer.isRetired || (updatedPlayer.age >= 41 && !updatedPlayer.isGodMode) || updatedGs?.youthCareerEnded == true || updatedGs?.pendingCallUpNationCode != null) break
         }
     }
 
@@ -3714,7 +3872,7 @@ private suspend fun adjustClubsReputations(
 
     // Helper functions
     private fun getMonthName(monthIndex: Int): String {
-        return listOf("August", "September", "October", "November", "December", "January", "February", "March", "April", "May")[monthIndex]
+        return listOf("August", "September", "October", "November", "December", "January", "February", "March", "April", "May", "June", "July")[monthIndex]
     }
 
     private fun getRepMultiplier(rep: String): Float {
@@ -4111,8 +4269,8 @@ private suspend fun adjustClubsReputations(
             
             // Apply Choice outcome modifiers
             player.form = (player.form + formMod).coerceIn(-5, 5)
-            player.finishing = applyStatGrowth(player.finishing, finishingMod.toFloat(), player.potentialCeiling)
-            player.technique = applyStatGrowth(player.technique, techniqueMod.toFloat(), player.potentialCeiling)
+            player.finishing = applyStatGrowth(player.finishing, finishingMod.toFloat(), player.finishingCeiling)
+            player.technique = applyStatGrowth(player.technique, techniqueMod.toFloat(), player.techniqueCeiling)
             player.morale = (player.morale + moraleMod).coerceIn(0, 100)
             player.fanReputation = (player.fanReputation + fanRepMod).coerceIn(0, 100)
             player.managerTrust = (player.managerTrust + managerTrustMod).coerceIn(0, 100)
@@ -4182,9 +4340,9 @@ private suspend fun adjustClubsReputations(
                 // Advance Month / Season
                 val currentMonth = gameState.currentMonthIndex
                 val nextMonth = currentMonth + 1
-                if (nextMonth <= 9) {
+                if (nextMonth <= 11) {
                     gameState.currentMonthIndex = nextMonth
-                    if (nextMonth == 5) {
+                    if (nextMonth == 0 || nextMonth == 5 || nextMonth == 10 || nextMonth == 11) {
                         player.hasTransferredThisWindow = false
                         dao.updatePlayer(player)
                     }
@@ -4451,6 +4609,7 @@ private suspend fun adjustClubsReputations(
             // Calculate match rating and MVP
             val matchRating = (6.0f + (playerGoals * 1.5f) + (playerAssists * 1.0f) + (player.finishing + player.pace + player.physical) * 0.005f + (Random.nextFloat() * 0.5f)).coerceIn(1.0f, 10.0f)
             fixture.playerRating = matchRating
+            player.recentMatchRatings = pushRecentRating(player.recentMatchRatings, matchRating)
             val ratingStr = "%.1f".format(matchRating)
 
             val earnedMvp = matchRating > 8.0f && (playerGoals > 0 || playerAssists > 0) && (Random.nextFloat() < 0.65f)
@@ -4677,6 +4836,7 @@ private suspend fun adjustClubsReputations(
             fixture.playerGoals = playerGoals
             fixture.playerAssists = playerAssists
             fixture.playerRating = matchRating.coerceIn(1.0f, 10.0f)
+            player.recentMatchRatings = pushRecentRating(player.recentMatchRatings, fixture.playerRating ?: matchRating)
             fixture.goalMinutes = goalMinutes
             fixture.assistMinutes = assistMinutes
 
@@ -4960,9 +5120,9 @@ private suspend fun adjustClubsReputations(
                 // Clear persisted transfer offers since we are leaving the current month
                 gameState.persistedTransferOffers = null
 
-                if (nextMonth <= 9) {
+                if (nextMonth <= 11) {
                     gameState.currentMonthIndex = nextMonth
-                    if (nextMonth == 5) {
+                    if (nextMonth == 0 || nextMonth == 5 || nextMonth == 10 || nextMonth == 11) {
                         player.hasTransferredThisWindow = false
                         dao.updatePlayer(player)
                     }
@@ -5278,9 +5438,15 @@ private suspend fun adjustClubsReputations(
 
     private suspend fun generateSocialPostsForMonth(player: PlayerEntity?, club: ClubEntity?, gameState: GameStateEntity) {
         val seed = if (player == null) {
-            (gameState.currentSeason * 31 + gameState.currentMonthIndex).toLong()
+            (gameState.currentSeason.toLong() * 397 + gameState.currentMonthIndex)
         } else {
-            (player.age.toLong() * 31 + player.ovr * 7 + gameState.currentSeason * 100 + gameState.currentMonthIndex).toLong()
+            var h = player.name.hashCode().toLong()
+            h = h * 31 + player.generation
+            h = h * 31 + player.age
+            h = h * 31 + player.ovr
+            h = h * 31 + gameState.currentSeason
+            h = h * 31 + gameState.currentMonthIndex
+            h
         }
         val rng = Random(seed)
 
@@ -6051,6 +6217,94 @@ private suspend fun adjustClubsReputations(
 
         dao.insertSocialPosts(newPosts)
         dao.pruneOldSocialPosts()
+    }
+
+    suspend fun evaluateNationalCallUp(player: PlayerEntity, gameState: GameStateEntity): Nation? {
+        if (player.careerPhase != PHASE_SENIOR) return null
+        if (player.nationalTeamCode != null) return null
+
+        val fatherNationalTeamCode: String? = if (player.generation > 1) {
+            dao.getLegacyByGeneration(player.generation - 1)?.nationalTeamCode
+        } else null
+
+        val eligibleCodes = getEligibleNationCodesIncludingInheritance(player, fatherNationalTeamCode)
+        if (eligibleCodes.isEmpty()) return null
+
+        val states = dao.getCallUpStateForPlayer(player.name, player.generation).associateBy { it.nationCode }
+        val isWC = isWorldCupSeason(gameState.currentSeason)
+        val avgRating = recentRatingAverage(player.recentMatchRatings) ?: return null
+
+        val qualifyingNations = mutableListOf<Nation>()
+
+        for (code in eligibleCodes) {
+            val nation = nationByCode(code) ?: continue
+            val st = states[code]
+            if (st?.permanentlyStopped == true) continue
+            if (st != null && st.cooldownUntilSeason > gameState.currentSeason) continue
+
+            val thresholds = thresholdsForTier(nation.tier)
+            val passesOvr = player.ovr >= thresholds.baseOvr
+            val ratingReq = if (isWC) thresholds.worldCupRating else thresholds.baseRating
+            val passesRating = avgRating >= ratingReq
+
+            if (passesOvr && passesRating) {
+                qualifyingNations.add(nation)
+            }
+        }
+
+        if (qualifyingNations.isEmpty()) return null
+
+        return qualifyingNations.sortedWith(
+            compareByDescending<Nation> { it.baseRankingPoints }.thenBy { it.code }
+        ).firstOrNull()
+    }
+
+    suspend fun acceptNationalCallUp(nationCode: String) {
+        val player = dao.getPlayerSync() ?: return
+        val gameState = dao.getGameStateSync() ?: return
+
+        player.nationalTeamCode = nationCode
+        dao.updatePlayer(player)
+
+        gameState.pendingCallUpNationCode = null
+        gameState.pendingCallUpIsWorldCup = false
+
+        val nationName = nationByCode(nationCode)?.name ?: nationCode
+        val logMsg = "🌍 Accepted call-up to represent $nationName!"
+        gameState.narrativeLog = capNarrativeLog(logMsg + "\n\n" + gameState.narrativeLog)
+        dao.updateGameState(gameState)
+    }
+
+    suspend fun declineNationalCallUp(nationCode: String) {
+        val player = dao.getPlayerSync() ?: return
+        val gameState = dao.getGameStateSync() ?: return
+
+        val existingStates = dao.getCallUpStateForPlayer(player.name, player.generation)
+        val state = existingStates.find { it.nationCode == nationCode } ?: NationCallUpState(
+            playerName = player.name,
+            generation = player.generation,
+            nationCode = nationCode,
+            declineCount = 0,
+            cooldownUntilSeason = 0,
+            permanentlyStopped = false
+        )
+
+        state.declineCount += 1
+        when (state.declineCount) {
+            1 -> state.cooldownUntilSeason = gameState.currentSeason + 1
+            2 -> state.cooldownUntilSeason = gameState.currentSeason + 1
+            else -> state.permanentlyStopped = true
+        }
+
+        dao.upsertCallUpState(state)
+
+        gameState.pendingCallUpNationCode = null
+        gameState.pendingCallUpIsWorldCup = false
+
+        val nationName = nationByCode(nationCode)?.name ?: nationCode
+        val logMsg = "🚫 Declined call-up from $nationName."
+        gameState.narrativeLog = capNarrativeLog(logMsg + "\n\n" + gameState.narrativeLog)
+        dao.updateGameState(gameState)
     }
 }
 

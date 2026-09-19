@@ -1,24 +1,25 @@
 Apex Striker Career - Privacy Policy
 
-Last updated: August 2026
+Last updated: September 2026
 
 1. Overview
 Apex Striker Career ("we", "our", or "us") respects your privacy. This Privacy Policy explains how data is handled when you play Apex Striker Career.
 
 2. Information Collection & Usage
-Apex Striker Career is an offline, single-player game. We do NOT collect, store, transmit, or share any personal identifiable information (PII), telemetry, location data, device identifiers, contacts, or user analytics.
+Apex Striker Career is a strictly offline, single-player football simulation game. We do NOT collect, store, transmit, or share any personally identifiable information (PII), device identifiers, location data, contacts, telemetry, or behavioral analytics.
 
 3. Local Data Storage
-All game states, career records, save slots, and settings are saved locally on your device using Android's SQLite/Room database and SharedPreferences. No data ever leaves your device or is transmitted to external servers.
+All career progress, match records, player statistics, national team history, settings, and save slots are saved locally and exclusively on your Android device via Room (SQLite) database files (`apex_career_slot_<slotId>.db`) and local SharedPreferences. No game data ever leaves your device or is transmitted to any external servers or third-party cloud infrastructure.
 
 4. Third-Party Services & SDKs
-Apex Striker Career does not integrate third-party advertising SDKs, tracking pixels, or data analytics services.
+Apex Striker Career contains zero third-party advertising SDKs, zero tracking pixels, zero analytics frameworks, and zero remote data beacons.
 
 5. Children's Privacy
-Our game is suitable for general audiences and does not knowingly collect any personal data from children or any other users.
+Our game is suitable for general audiences of all ages and does not knowingly collect, store, or process personal data from children or any other users.
 
 6. Changes to Privacy Policy
-We may update our Privacy Policy from time to time. Any changes will be reflected in updated versions of the game.
+We may update our Privacy Policy periodically. Any updates will be reflected within updated versions of the application and documentation.
 
 7. Contact Us
-If you have any questions regarding this Privacy Policy, please contact us at Apexstrikersim@gmail.com or consult the app settings.
+If you have any questions or feedback regarding this Privacy Policy, please contact us at Apexstrikersim@gmail.com.
+

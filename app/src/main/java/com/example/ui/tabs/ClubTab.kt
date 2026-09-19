@@ -4,6 +4,7 @@ import com.example.ui.components.ClubCrestIcon
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
@@ -35,10 +36,11 @@ fun ClubTab(viewModel: CareerViewModel, player: PlayerEntity, club: ClubEntity?)
 
     val gameStateState by viewModel.gameStateFlow.collectAsStateWithLifecycle()
     val currentMonthIndex = gameStateState?.currentMonthIndex ?: 0
-    val isTransferOpen = currentMonthIndex == 0 || currentMonthIndex == 5
+    val isTransferOpen = currentMonthIndex == 0 || currentMonthIndex == 5 || currentMonthIndex == 10 || currentMonthIndex == 11
 
     var showTrainingDialog by remember { mutableStateOf(false) }
     var showRetireConfirmDialog by remember { mutableStateOf(false) }
+    var viewMode by remember { mutableStateOf("CLUB") } // "CLUB" or "NATIONAL"
 
     var managerSeasonsAtClub by remember(club.id) { mutableStateOf(0) }
     LaunchedEffect(club.id) {
@@ -56,18 +58,59 @@ fun ClubTab(viewModel: CareerViewModel, player: PlayerEntity, club: ClubEntity?)
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         item {
-            Text(
-                text = "CLUB HUB",
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Bold,
-                color = PitchGreen
-            )
-            Text(
-                text = "Squad status, target tracker, and rival comparison",
-                fontSize = 12.sp,
-                color = TextSecondary
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(if (viewMode == "CLUB") PitchGreen else DarkSlate)
+                        .clickable { viewMode = "CLUB" }
+                        .padding(vertical = 10.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "CLUB",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 12.sp,
+                        color = if (viewMode == "CLUB") Color.Black else TextPrimary
+                    )
+                }
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(if (viewMode == "NATIONAL") PitchGreen else DarkSlate)
+                        .clickable { viewMode = "NATIONAL" }
+                        .padding(vertical = 10.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "NATIONAL TEAM",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 12.sp,
+                        color = if (viewMode == "NATIONAL") Color.Black else TextPrimary
+                    )
+                }
+            }
         }
+
+        if (viewMode == "CLUB") {
+            item {
+                Text(
+                    text = "CLUB HUB",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = PitchGreen
+                )
+                Text(
+                    text = "Squad status, target tracker, and rival comparison",
+                    fontSize = 12.sp,
+                    color = TextSecondary
+                )
+            }
 
         // Club Profile Card
         item {
@@ -578,70 +621,195 @@ fun ClubTab(viewModel: CareerViewModel, player: PlayerEntity, club: ClubEntity?)
 
         // Actions: Request Transfer / Voluntary Retire
         item {
-            Column(
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                if (player.age in 13..15) {
-                    Card(
-                        colors = CardDefaults.cardColors(containerColor = SportsCardBg.copy(alpha = 0.5f)),
-                        shape = RoundedCornerShape(12.dp),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text(
-                            text = "🎓 Youth Academy Striker: Professional transfer requests are locked until graduation at age 16.",
-                            fontSize = 12.sp,
-                            color = PitchGreen,
-                            fontWeight = FontWeight.Medium,
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier.padding(12.dp).fillMaxWidth()
-                        )
-                    }
-                } else if (!isTransferOpen) {
-                    Card(
-                        colors = CardDefaults.cardColors(containerColor = SportsCardBg.copy(alpha = 0.5f)),
-                        shape = RoundedCornerShape(12.dp),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text(
-                            text = "⏳ Transfer Window Closed. Standard windows are open in August (Month 0) and January (Month 5).",
-                            fontSize = 12.sp,
-                            color = TextSecondary,
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier.padding(12.dp).fillMaxWidth()
-                        )
-                    }
-                }
-
-                Button(
-                    onClick = { viewModel.checkTransferOffers() },
-                    enabled = isTransferOpen && (player.age >= 16),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = PitchGreen,
-                        contentColor = Color.Black,
-                        disabledContainerColor = DarkSlate,
-                        disabledContentColor = TextSecondary
-                    ),
-                    shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(48.dp)
-                        .testTag("transfer_request_button")
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Text(text = "REQUEST TRANSFERS", fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                }
+                    if (player.age in 13..15) {
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = SportsCardBg.copy(alpha = 0.5f)),
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                text = "🎓 Youth Academy Striker: Professional transfer requests are locked until graduation at age 16.",
+                                fontSize = 12.sp,
+                                color = PitchGreen,
+                                fontWeight = FontWeight.Medium,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.padding(12.dp).fillMaxWidth()
+                            )
+                        }
+                    } else if (!isTransferOpen) {
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = SportsCardBg.copy(alpha = 0.5f)),
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                text = "⏳ Transfer Window Closed. Open in August, January, June, and July.",
+                                fontSize = 12.sp,
+                                color = TextSecondary,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.padding(12.dp).fillMaxWidth()
+                            )
+                        }
+                    }
 
-                if (player.age >= 32) {
                     Button(
-                        onClick = { showRetireConfirmDialog = true },
-                        colors = ButtonDefaults.buttonColors(containerColor = MutedRed, contentColor = Color.White),
+                        onClick = { viewModel.checkTransferOffers() },
+                        enabled = isTransferOpen && (player.age >= 16),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = PitchGreen,
+                            contentColor = Color.Black,
+                            disabledContainerColor = DarkSlate,
+                            disabledContentColor = TextSecondary
+                        ),
                         shape = RoundedCornerShape(12.dp),
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(48.dp)
-                            .testTag("retire_button")
+                            .testTag("transfer_request_button")
                     ) {
-                        Text(text = "ANNOUNCE RETIREMENT", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                        Text(text = "REQUEST TRANSFERS", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                    }
+
+                    if (player.age >= 32) {
+                        Button(
+                            onClick = { showRetireConfirmDialog = true },
+                            colors = ButtonDefaults.buttonColors(containerColor = MutedRed, contentColor = Color.White),
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(48.dp)
+                                .testTag("retire_button")
+                        ) {
+                            Text(text = "ANNOUNCE RETIREMENT", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                        }
+                    }
+                }
+            }
+        }
+
+        // National Team Section
+        if (viewMode == "NATIONAL") {
+            item {
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = SportsCardBg),
+                    shape = RoundedCornerShape(16.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("national_team_card")
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "INTERNATIONAL STATUS",
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = PitchGreen
+                            )
+                            if (player.nationalTeamCode != null) {
+                                Surface(
+                                    shape = RoundedCornerShape(6.dp),
+                                    color = PitchGreen.copy(alpha = 0.2f),
+                                    contentColor = PitchGreen
+                                ) {
+                                    Text(
+                                        text = "COMMITTED",
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                                    )
+                                }
+                            } else {
+                                Surface(
+                                    shape = RoundedCornerShape(6.dp),
+                                    color = DarkSlate,
+                                    contentColor = TextSecondary
+                                ) {
+                                    Text(
+                                        text = "UNCAPPED",
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                                    )
+                                }
+                            }
+                        }
+
+                        if (player.nationalTeamCode != null) {
+                            val nation = com.example.data.nationByCode(player.nationalTeamCode!!)
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(44.dp)
+                                        .clip(CircleShape)
+                                        .background(DarkSlate)
+                                        .border(1.dp, BorderColor, CircleShape),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = player.nationalTeamCode!!,
+                                        fontWeight = FontWeight.Black,
+                                        fontSize = 13.sp,
+                                        color = TextPrimary
+                                    )
+                                }
+                                Column {
+                                    Text(
+                                        text = nation?.name ?: player.nationalTeamCode!!,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 16.sp,
+                                        color = TextPrimary
+                                    )
+                                    Text(
+                                        text = "${player.nationalTeamCaps} Senior Caps · Tier: ${nation?.tier?.name ?: "N/A"}",
+                                        fontSize = 12.sp,
+                                        color = TextSecondary
+                                    )
+                                }
+                            }
+                        } else {
+                            val birthNationCode = com.example.data.nationCodeForCountryName(player.birthCountry)
+                            val birthNation = birthNationCode?.let { com.example.data.nationByCode(it) }
+                            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Text(
+                                    text = "Eligible by Birth: ${birthNation?.name ?: player.birthCountry} (${birthNationCode ?: "N/A"})",
+                                    fontSize = 13.sp,
+                                    color = TextPrimary
+                                )
+                                if (player.residencyDaysByCountry.isNotBlank()) {
+                                    val entries = player.residencyDaysByCountry.split(";").mapNotNull { entry ->
+                                        val parts = entry.split(":")
+                                        if (parts.size == 2) {
+                                            val code = parts[0]
+                                            val days = parts[1].toIntOrNull() ?: 0
+                                            val n = com.example.data.nationByCode(code)
+                                            val years = days / 365
+                                            "${n?.name ?: code}: $years/5 years ($days days)"
+                                        } else null
+                                    }
+                                    if (entries.isNotEmpty()) {
+                                        Text(
+                                            text = "Residency Progress:\n" + entries.joinToString("\n"),
+                                            fontSize = 12.sp,
+                                            color = TextSecondary
+                                        )
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }

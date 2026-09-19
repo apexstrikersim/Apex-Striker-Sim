@@ -12,11 +12,15 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.ArrowDropUp
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.LocationCity
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.School
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.filled.SportsSoccer
 import androidx.compose.material3.*
@@ -38,11 +42,15 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.FaceDescriptor
 import com.example.data.FictionalData
+import com.example.data.flagEmoji
+import com.example.data.nationFlagEmoji
 import com.example.ui.CareerViewModel
-import com.example.ui.components.CountryFlagIcon
 import com.example.ui.components.JerseyNumberIcon
 import com.example.ui.components.RepeatingStepperButton
 import com.example.ui.theme.*
+
+private val LEAGUE_ACADEMY_COUNTRIES = listOf("England", "Spain", "France", "Germany", "Italy")
+fun randomAcademyCountry(): String = LEAGUE_ACADEMY_COUNTRIES.random()
 
 @Composable
 fun SetupScreen(viewModel: CareerViewModel) {
@@ -52,13 +60,21 @@ fun SetupScreen(viewModel: CareerViewModel) {
     var firstName by remember { mutableStateOf("") }
     var lastName by remember { mutableStateOf("") }
     var selectedBirthCountry by remember { mutableStateOf("England") }
+    var birthCountrySearchQuery by remember { mutableStateOf("") }
+    var isBirthCountryDropdownExpanded by remember { mutableStateOf(false) }
+
+    val filteredNations = remember(birthCountrySearchQuery) {
+        val alphabeticalNations = com.example.data.ALL_NATIONS.sortedBy { it.name }
+        if (birthCountrySearchQuery.isBlank()) alphabeticalNations
+        else alphabeticalNations.filter { it.name.contains(birthCountrySearchQuery, ignoreCase = true) }
+    }
+
     var preferredFoot by remember { mutableStateOf("Right") }
     var squadNumber by remember { mutableIntStateOf(9) }
     var backgroundStory by remember { mutableStateOf("Street Cages") }
     var isFirstNameFocused by remember { mutableStateOf(false) }
     var isLastNameFocused by remember { mutableStateOf(false) }
 
-    val countries = listOf("England", "Spain", "France", "Germany", "Italy")
     val feet = listOf("Left", "Right", "Both")
     val stories = listOf("Street Cages", "School Team", "Family Club")
 
@@ -178,8 +194,9 @@ fun SetupScreen(viewModel: CareerViewModel) {
                     )
                     IconButton(
                         onClick = {
-                            firstName = FictionalData.generateRandomFirstName(selectedBirthCountry)
-                            lastName = FictionalData.generateRandomLastName(selectedBirthCountry)
+                            val randomCountry = randomAcademyCountry()
+                            firstName = FictionalData.generateRandomFirstName(randomCountry)
+                            lastName = FictionalData.generateRandomLastName(randomCountry)
                         },
                         modifier = Modifier
                             .size(36.dp)
@@ -433,47 +450,157 @@ fun SetupScreen(viewModel: CareerViewModel) {
                     color = PitchGreen
                 )
                 Text(
-                    text = "Select your heritage & birthplace",
+                    text = "Select your birth country",
                     fontSize = 12.sp,
                     color = TextSecondary
                 )
 
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(DarkSlate)
+                        .border(1.dp, if (isBirthCountryDropdownExpanded) PitchGreen else BorderColor, RoundedCornerShape(12.dp))
+                        .clickable { isBirthCountryDropdownExpanded = !isBirthCountryDropdownExpanded }
+                        .padding(horizontal = 14.dp, vertical = 12.dp)
+                        .testTag("birth_country_picker"),
+                    contentAlignment = Alignment.CenterStart
                 ) {
-                    countries.forEach { country ->
-                        val isSelected = selectedBirthCountry == country
-                        val code = getCountryCode(country)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column {
+                            Text(
+                                text = "BIRTH COUNTRY",
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = TextSecondary,
+                                letterSpacing = 0.8.sp
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = "${nationFlagEmoji(selectedBirthCountry)} $selectedBirthCountry",
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = TextPrimary
+                            )
+                        }
+                        Icon(
+                            imageVector = if (isBirthCountryDropdownExpanded) Icons.Default.ArrowDropUp else Icons.Default.ArrowDropDown,
+                            contentDescription = "Toggle Country Dropdown",
+                            tint = PitchGreen,
+                            modifier = Modifier.size(28.dp)
+                        )
+                    }
+                }
 
+                if (isBirthCountryDropdownExpanded) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(DarkSlate)
+                            .border(1.dp, BorderColor, RoundedCornerShape(12.dp))
+                            .padding(10.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        // Search Input
+                        OutlinedTextField(
+                            value = birthCountrySearchQuery,
+                            onValueChange = { birthCountrySearchQuery = it },
+                            placeholder = { Text("Search 200 nations...", fontSize = 13.sp, color = TextSecondary) },
+                            singleLine = true,
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = Icons.Default.Search,
+                                    contentDescription = "Search",
+                                    tint = PitchGreen,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            },
+                            trailingIcon = {
+                                if (birthCountrySearchQuery.isNotEmpty()) {
+                                    IconButton(
+                                        onClick = { birthCountrySearchQuery = "" },
+                                        modifier = Modifier.size(24.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Close,
+                                            contentDescription = "Clear",
+                                            tint = TextSecondary,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                    }
+                                }
+                            },
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = PitchGreen,
+                                unfocusedBorderColor = BorderColor,
+                                focusedTextColor = TextPrimary,
+                                unfocusedTextColor = TextPrimary,
+                                cursorColor = PitchGreen
+                            ),
+                            textStyle = TextStyle(fontSize = 14.sp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(50.dp)
+                                .testTag("birth_country_search_input")
+                        )
+
+                        // Scrollable list
                         Box(
                             modifier = Modifier
-                                .weight(1f)
-                                .height(60.dp)
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(if (isSelected) PitchGreen else DarkSlate)
-                                .then(
-                                    if (!isSelected) Modifier.border(1.dp, BorderColor, RoundedCornerShape(12.dp))
-                                    else Modifier
-                                )
-                                .clickable { selectedBirthCountry = country },
-                            contentAlignment = Alignment.Center
+                                .fillMaxWidth()
+                                .height(240.dp)
+                                .verticalScroll(rememberScrollState())
                         ) {
                             Column(
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.Center
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalArrangement = Arrangement.spacedBy(2.dp)
                             ) {
-                                CountryFlagIcon(
-                                    country = country,
-                                    modifier = Modifier.size(width = 24.dp, height = 16.dp)
-                                )
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Text(
-                                    text = code,
-                                    fontSize = 10.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = if (isSelected) SportsDarkBg else TextPrimary
-                                )
+                                if (filteredNations.isEmpty()) {
+                                    Text(
+                                        text = "No nations found",
+                                        fontSize = 13.sp,
+                                        color = TextSecondary,
+                                        modifier = Modifier.padding(12.dp)
+                                    )
+                                } else {
+                                    filteredNations.forEach { nation ->
+                                        val isChosen = nation.name == selectedBirthCountry
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .clip(RoundedCornerShape(8.dp))
+                                                .background(if (isChosen) PitchGreen.copy(alpha = 0.15f) else Color.Transparent)
+                                                .clickable {
+                                                    selectedBirthCountry = nation.name
+                                                    isBirthCountryDropdownExpanded = false
+                                                    birthCountrySearchQuery = ""
+                                                    keyboardController?.hide()
+                                                    focusManager.clearFocus()
+                                                }
+                                                .padding(horizontal = 12.dp, vertical = 10.dp),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text(
+                                                text = "${nation.flagEmoji} ${nation.name}",
+                                                fontSize = 14.sp,
+                                                fontWeight = if (isChosen) FontWeight.Bold else FontWeight.Normal,
+                                                color = if (isChosen) PitchGreen else TextPrimary
+                                            )
+                                            Text(
+                                                text = "${nation.code} · ${nation.tier.name}",
+                                                fontSize = 11.sp,
+                                                fontWeight = FontWeight.Medium,
+                                                color = TextSecondary
+                                            )
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
@@ -584,11 +711,12 @@ fun SetupScreen(viewModel: CareerViewModel) {
                     val fName = firstName.trim()
                     val lName = lastName.trim()
                     val fullName = "$fName $lName"
-                    val generatedFace = FaceDescriptor.random(getCountryCode(selectedBirthCountry)).serialize()
+                    val assignedAcademyCountry = randomAcademyCountry()
+                    val generatedFace = FaceDescriptor.random(getCountryCode(assignedAcademyCountry)).serialize()
                     viewModel.createCharacter(
                         name = fullName,
                         birth = selectedBirthCountry,
-                        academy = selectedBirthCountry,
+                        academy = assignedAcademyCountry,
                         preferredFoot = preferredFoot,
                         squadNumber = squadNumber,
                         backgroundStory = backgroundStory,

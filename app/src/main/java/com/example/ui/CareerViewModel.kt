@@ -253,10 +253,9 @@ class CareerViewModel(application: Application) : AndroidViewModel(application) 
         val last = saveSlotManager.getLastActiveSlot()
         _hasActiveSave.value = last != 0 && saveSlotManager.getSlotMetadata(last).hasData
         if (_activeSlotId.value == slotId) {
-            viewModelScope.launch {
-                repository.clearAllData()
-                syncSlotMetadata()
-            }
+            _playerFlow.value = null
+            repository = CareerRepository(getApplication(), slotId)
+            reloadStateFromRepository()
         }
     }
 
@@ -503,6 +502,13 @@ class CareerViewModel(application: Application) : AndroidViewModel(application) 
     private val _isAdvancing = MutableStateFlow(false)
     val isAdvancing = _isAdvancing.asStateFlow()
 
+    private val _snackbarMessage = MutableStateFlow<String?>(null)
+    val snackbarMessage = _snackbarMessage.asStateFlow()
+
+    fun clearSnackbarMessage() {
+        _snackbarMessage.value = null
+    }
+
     private val _isSimulatingSeason = MutableStateFlow(false)
     val isSimulatingSeason = _isSimulatingSeason.asStateFlow()
 
@@ -627,11 +633,41 @@ class CareerViewModel(application: Application) : AndroidViewModel(application) 
         if (_isAdvancing.value) return
         viewModelScope.launch {
             _isAdvancing.value = true
-            val player = playerFlow.value
-            val gameState = gameStateFlow.value
-            if (player != null && gameState != null) {
-                if (player.careerPhase == com.example.data.PHASE_STREET || player.careerPhase == com.example.data.PHASE_YOUTH) {
-                    repository.advanceMonth()
+            try {
+                val player = playerFlow.value
+                val gameState = gameStateFlow.value
+                if (player != null && gameState != null) {
+                    if (player.careerPhase == com.example.data.PHASE_STREET || player.careerPhase == com.example.data.PHASE_YOUTH) {
+                        repository.advanceMonth()
+
+                        val updatedPlayer = repository.getPlayerSync()
+                        val updatedGameState = repository.getGameStateSync()
+
+                        if (updatedPlayer?.isRetired == true) {
+                            _activeScreen.value = Screen.RETIRED_SUMMARY
+                        } else if (updatedGameState?.youthCareerEnded == true) {
+                            _activeScreen.value = Screen.YOUTH_CAREER_ENDED
+                        }
+
+                        return@launch
+                    }
+
+                    val currentMonth = gameState.currentMonthIndex
+                    val playerClubId = player.currentClubId
+                    var nextMatch = repository.getNextPlayerMatchInMonth(currentMonth, playerClubId)
+
+                    while (nextMatch != null) {
+                        val rotation = repository.calculateRotationForFixture(nextMatch, player, currentMonth)
+                        _activeMatch.value = nextMatch
+                        _playerCameOnMinute.value = if (rotation.isBenched) null else rotation.playerCameOnMinute
+                        _isQuickSimCompleted.value = false
+                        _activeScreen.value = Screen.MATCH_SCREEN
+                        return@launch
+                    }
+
+                    // All player matches for this month have been simulated!
+                    // Run other teams' matches, progression, and monthly choice events
+                    repository.simulateRemainingMonth()
 
                     val updatedPlayer = repository.getPlayerSync()
                     val updatedGameState = repository.getGameStateSync()
@@ -641,39 +677,13 @@ class CareerViewModel(application: Application) : AndroidViewModel(application) 
                     } else if (updatedGameState?.youthCareerEnded == true) {
                         _activeScreen.value = Screen.YOUTH_CAREER_ENDED
                     }
-
-                    _isAdvancing.value = false
-                    return@launch
                 }
-
-                val currentMonth = gameState.currentMonthIndex
-                val playerClubId = player.currentClubId
-                var nextMatch = repository.getNextPlayerMatchInMonth(currentMonth, playerClubId)
-                
-                while (nextMatch != null) {
-                    val rotation = repository.calculateRotationForFixture(nextMatch, player, currentMonth)
-                    _activeMatch.value = nextMatch
-                    _playerCameOnMinute.value = if (rotation.isBenched) null else rotation.playerCameOnMinute
-                    _isQuickSimCompleted.value = false
-                    _activeScreen.value = Screen.MATCH_SCREEN
-                    _isAdvancing.value = false
-                    return@launch
-                }
-                
-                // All player matches for this month have been simulated!
-                // Run other teams' matches, progression, and monthly choice events
-                repository.simulateRemainingMonth()
-
-                val updatedPlayer = repository.getPlayerSync()
-                val updatedGameState = repository.getGameStateSync()
-
-                if (updatedPlayer?.isRetired == true) {
-                    _activeScreen.value = Screen.RETIRED_SUMMARY
-                } else if (updatedGameState?.youthCareerEnded == true) {
-                    _activeScreen.value = Screen.YOUTH_CAREER_ENDED
-                }
+            } catch (e: Exception) {
+                android.util.Log.e("CareerViewModel", "advanceMonth failed", e)
+                _snackbarMessage.value = "Something went wrong advancing the month: ${e.message ?: e.javaClass.simpleName}. Please try again."
+            } finally {
+                _isAdvancing.value = false
             }
-            _isAdvancing.value = false
         }
     }
 
@@ -699,6 +709,9 @@ class CareerViewModel(application: Application) : AndroidViewModel(application) 
                 }
                 _activeMatch.value = fixture.copy()
                 _isQuickSimCompleted.value = true
+            } catch (e: Exception) {
+                android.util.Log.e("CareerViewModel", "quickSimCurrentMatch failed", e)
+                _snackbarMessage.value = "Something went wrong simulating match: ${e.message ?: e.javaClass.simpleName}. Please try again."
             } finally {
                 _isAdvancing.value = false
             }
@@ -760,6 +773,9 @@ class CareerViewModel(application: Application) : AndroidViewModel(application) 
                 _activeScreen.value = Screen.GAMEPLAY
                 _activeMatch.value = null
                 _playerCameOnMinute.value = null
+            } catch (e: Exception) {
+                android.util.Log.e("CareerViewModel", "resolvePlayedMatch failed", e)
+                _snackbarMessage.value = "Something went wrong resolving match: ${e.message ?: e.javaClass.simpleName}. Please try again."
             } finally {
                 _isAdvancing.value = false
             }
@@ -848,6 +864,21 @@ class CareerViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     /**
+     * National Team Call-Up Actions
+     */
+    fun acceptNationalCallUp(nationCode: String) {
+        viewModelScope.launch {
+            repository.acceptNationalCallUp(nationCode)
+        }
+    }
+
+    fun declineNationalCallUp(nationCode: String) {
+        viewModelScope.launch {
+            repository.declineNationalCallUp(nationCode)
+        }
+    }
+
+    /**
      * Restart/Reset all data
      */
     fun resetGame() {
@@ -927,6 +958,9 @@ class CareerViewModel(application: Application) : AndroidViewModel(application) 
                 } else if (updatedGameState?.youthCareerEnded == true) {
                     _activeScreen.value = Screen.YOUTH_CAREER_ENDED
                 }
+            } catch (e: Exception) {
+                android.util.Log.e("CareerViewModel", "devSimulateSeason failed", e)
+                _snackbarMessage.value = "Something went wrong simulating season: ${e.message ?: e.javaClass.simpleName}. Please try again."
             } finally {
                 _isAdvancing.value = false
                 _isSimulatingSeason.value = false

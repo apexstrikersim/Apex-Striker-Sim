@@ -175,6 +175,51 @@ fun HomeTab(
                         StatSnapshotItem(label = "MVPS", value = player.seasonMvps.toString(), tint = TrophyGold)
                     }
 
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    // National Team Row
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(8.dp),
+                        color = DarkSlate
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 12.dp, vertical = 8.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            val natCode = player.nationalTeamCode
+                            val natName = if (natCode != null) com.example.data.nationByCode(natCode)?.name ?: natCode else null
+                            if (natName != null) {
+                                Text(
+                                    text = "🌐 $natName",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = PitchGreen
+                                )
+                                Text(
+                                    text = "${player.nationalTeamCaps} caps",
+                                    fontSize = 11.sp,
+                                    color = Color.White
+                                )
+                            } else {
+                                Text(
+                                    text = "🌐 International",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = TextSecondary
+                                )
+                                Text(
+                                    text = "Uncapped",
+                                    fontSize = 11.sp,
+                                    color = TextSecondary
+                                )
+                            }
+                        }
+                    }
+
                     Spacer(modifier = Modifier.height(12.dp))
                     HorizontalDivider(color = BorderColor)
                     Spacer(modifier = Modifier.height(12.dp))

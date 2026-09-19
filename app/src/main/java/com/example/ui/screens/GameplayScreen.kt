@@ -33,6 +33,7 @@ import com.example.data.PlayerEntity
 import com.example.data.formatSeasonYear
 import com.example.ui.*
 import com.example.ui.dialogs.ChoiceEventDialog
+import com.example.ui.dialogs.NationalCallUpDialog
 import com.example.ui.dialogs.SeasonSummaryDialog
 import com.example.ui.dialogs.SettingsDialog
 import com.example.ui.dialogs.TransferOffersDialog
@@ -178,8 +179,8 @@ fun GameplayScreen(
                     Triple(GameTab.CALENDAR, Icons.Default.RssFeed, "Feed"),
                     Triple(GameTab.TROPHIES, Icons.Default.EmojiEvents, "Trophies"),
                     Triple(GameTab.HOME, Icons.Default.Home, "Home"),
-                    Triple(GameTab.LEAGUE, Icons.Default.FormatListNumbered, "League"),
-                    Triple(GameTab.CLUB, Icons.Default.Shield, "Club")
+                    Triple(GameTab.LEAGUE, Icons.Default.Public, "Comps"),
+                    Triple(GameTab.CLUB, Icons.Default.Shield, "Squad")
                 )
 
                 tabs.forEach { (tab, icon, label) ->
@@ -205,7 +206,7 @@ fun GameplayScreen(
                             }
                         },
                         icon = { Icon(imageVector = icon, contentDescription = label) },
-                        label = { Text(label, fontSize = 10.sp) },
+                        label = { Text(label, fontSize = 10.sp, maxLines = 1, softWrap = false, overflow = TextOverflow.Clip) },
                         colors = NavigationBarItemDefaults.colors(
                             selectedIconColor = Color.Black,
                             selectedTextColor = PitchGreen,
@@ -298,6 +299,14 @@ fun GameplayScreen(
 
     // Dialog Queue: Render dialogs sequentially with clean priority so only one displays at any time
     when {
+        gameState.pendingCallUpNationCode != null && !isSimulatingSeason -> {
+            NationalCallUpDialog(
+                nationCode = gameState.pendingCallUpNationCode!!,
+                isWorldCup = gameState.pendingCallUpIsWorldCup,
+                onAccept = { viewModel.acceptNationalCallUp(gameState.pendingCallUpNationCode!!) },
+                onDecline = { viewModel.declineNationalCallUp(gameState.pendingCallUpNationCode!!) }
+            )
+        }
         isShowingSettings && !isSimulatingSeason -> {
             SettingsDialog(viewModel, gameState)
         }

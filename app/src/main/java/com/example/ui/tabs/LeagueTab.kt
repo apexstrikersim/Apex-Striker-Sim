@@ -9,6 +9,10 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.EmojiEvents
+import androidx.compose.material.icons.filled.Public
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -30,6 +34,7 @@ import com.example.ui.theme.*
 
 @Composable
 fun LeagueTab(viewModel: CareerViewModel, player: PlayerEntity) {
+    val gameState by viewModel.gameStateFlow.collectAsStateWithLifecycle()
     val selectedCountry by viewModel.selectedStandingCountry.collectAsStateWithLifecycle()
     val standings by viewModel.currentStandings.collectAsStateWithLifecycle()
     val clubs by viewModel.clubsFlow.collectAsStateWithLifecycle()
@@ -40,8 +45,9 @@ fun LeagueTab(viewModel: CareerViewModel, player: PlayerEntity) {
         clubsMap[player.currentClubId]?.country
     }
 
-    var viewMode by remember { mutableStateOf("DOMESTIC") } // "DOMESTIC" or "EUROPE"
+    var viewMode by remember { mutableStateOf("DOMESTIC") } // "DOMESTIC", "EUROPE", or "WORLD_CUP"
     var selectedComp by remember { mutableStateOf("CHAMPIONS_LEAGUE") } // "CHAMPIONS_LEAGUE", "EUROPA_LEAGUE", "CONFERENCE_LEAGUE"
+    var showPastWinnersDialog by remember { mutableStateOf(false) }
 
     val compFixtures = remember(fixtures, selectedComp) {
         fixtures.filter { it.competition == selectedComp }
@@ -73,9 +79,9 @@ fun LeagueTab(viewModel: CareerViewModel, player: PlayerEntity) {
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = "DOMESTIC LEAGUES",
+                        text = "DOMESTIC",
                         fontWeight = FontWeight.Bold,
-                        fontSize = 12.sp,
+                        fontSize = 11.sp,
                         color = if (viewMode == "DOMESTIC") Color.Black else TextPrimary
                     )
                 }
@@ -89,10 +95,26 @@ fun LeagueTab(viewModel: CareerViewModel, player: PlayerEntity) {
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = "EUROPEAN CUPS",
+                        text = "EUROPE",
                         fontWeight = FontWeight.Bold,
-                        fontSize = 12.sp,
+                        fontSize = 11.sp,
                         color = if (viewMode == "EUROPE") Color.Black else TextPrimary
+                    )
+                }
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(if (viewMode == "WORLD_CUP") PitchGreen else DarkSlate)
+                        .clickable { viewMode = "WORLD_CUP" }
+                        .padding(vertical = 10.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "WORLD CUP",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 11.sp,
+                        color = if (viewMode == "WORLD_CUP") Color.Black else TextPrimary
                     )
                 }
             }
@@ -285,7 +307,7 @@ fun LeagueTab(viewModel: CareerViewModel, player: PlayerEntity) {
                     }
                 }
             }
-        } else {
+        } else if (viewMode == "EUROPE") {
             // European Cups view
             item {
                 Row(
@@ -582,6 +604,311 @@ fun LeagueTab(viewModel: CareerViewModel, player: PlayerEntity) {
                                 }
                             }
                         }
+                    }
+                }
+            }
+        } else if (viewMode == "WORLD_CUP") {
+            val currentSeason = gameState?.currentSeason ?: 1
+            val isWC = com.example.data.isWorldCupSeason(currentSeason)
+
+            item {
+                Text(
+                    text = "WORLD CUP",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = TrophyGold
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+            }
+
+            if (isWC) {
+                val tournamentYear = com.example.data.seasonDisplayStartYear(currentSeason)
+                item {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = CardDefaults.cardColors(containerColor = SportsCardBg),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, PitchGreen.copy(alpha = 0.5f))
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.EmojiEvents,
+                                    contentDescription = null,
+                                    tint = TrophyGold,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                                Text(
+                                    text = "$tournamentYear FIFA WORLD CUP",
+                                    fontSize = 16.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = TrophyGold
+                                )
+                            }
+                            Text(
+                                text = "Tournament year is underway! National teams compete on the global stage this June.",
+                                fontSize = 13.sp,
+                                color = TextSecondary
+                            )
+                            HorizontalDivider(color = DarkSlate)
+                            if (player.nationalTeamCode != null) {
+                                val myNation = com.example.data.nationByCode(player.nationalTeamCode!!)
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column {
+                                        Text(
+                                            text = "YOUR NATION",
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = TextSecondary
+                                        )
+                                        Text(
+                                            text = myNation?.name ?: player.nationalTeamCode!!,
+                                            fontSize = 15.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = PitchGreen
+                                        )
+                                    }
+                                    Column(horizontalAlignment = Alignment.End) {
+                                        Text(
+                                            text = "CAPS",
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = TextSecondary
+                                        )
+                                        Text(
+                                            text = "${player.nationalTeamCaps}",
+                                            fontSize = 15.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = TextPrimary
+                                        )
+                                    }
+                                }
+                            } else {
+                                Text(
+                                    text = "You are not yet part of a national team",
+                                    fontSize = 13.sp,
+                                    color = TextSecondary,
+                                    fontStyle = androidx.compose.ui.text.font.FontStyle.Italic
+                                )
+                            }
+                        }
+                    }
+                }
+            } else {
+                val nextWcSeason = run {
+                    var s = currentSeason + 1
+                    while (!com.example.data.isWorldCupSeason(s)) s++
+                    s
+                }
+                val nextWcYear = com.example.data.seasonDisplayStartYear(nextWcSeason)
+                val seasonsRemaining = nextWcSeason - currentSeason
+
+                item {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = CardDefaults.cardColors(containerColor = SportsCardBg),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, BorderColor)
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Public,
+                                    contentDescription = null,
+                                    tint = TextSecondary,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Text(
+                                    text = "FIFA WORLD CUP",
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = TextSecondary
+                                )
+                            }
+                            Text(
+                                text = "Next World Cup: $nextWcYear — $seasonsRemaining ${if (seasonsRemaining == 1) "season" else "seasons"} away",
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = TextPrimary
+                            )
+                            Text(
+                                text = "The World Cup occurs quadrennially. Keep developing your reputation and club performances to earn a call-up.",
+                                fontSize = 12.sp,
+                                color = TextSecondary
+                            )
+                            if (player.nationalTeamCode != null) {
+                                val myNation = com.example.data.nationByCode(player.nationalTeamCode!!)
+                                HorizontalDivider(color = DarkSlate)
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = "Committed Nation: ${myNation?.name ?: player.nationalTeamCode}",
+                                        fontSize = 12.sp,
+                                        color = PitchGreen
+                                    )
+                                    Text(
+                                        text = "${player.nationalTeamCaps} Caps",
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = TextPrimary
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            item {
+                Button(
+                    onClick = { showPastWinnersDialog = true },
+                    modifier = Modifier.fillMaxWidth().testTag("world_cup_past_winners_button"),
+                    colors = ButtonDefaults.buttonColors(containerColor = DarkSlate),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.EmojiEvents,
+                        contentDescription = null,
+                        tint = TrophyGold,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "PAST WINNERS",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 13.sp,
+                        color = TextPrimary
+                    )
+                }
+            }
+        }
+    }
+
+    if (showPastWinnersDialog) {
+        val historyRaw = gameState?.worldCupWinnersHistory.orEmpty()
+        val entries = remember(historyRaw) {
+            historyRaw.split(";").filter { it.isNotBlank() }.reversed()
+        }
+        androidx.compose.ui.window.Dialog(onDismissRequest = { showPastWinnersDialog = false }) {
+            Card(
+                modifier = Modifier.fillMaxWidth().padding(16.dp),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = SportsCardBg),
+                border = androidx.compose.foundation.BorderStroke(1.dp, BorderColor)
+            ) {
+                Column(
+                    modifier = Modifier.fillMaxWidth().padding(20.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "WORLD CUP HISTORY",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 16.sp,
+                            color = TrophyGold
+                        )
+                        IconButton(onClick = { showPastWinnersDialog = false }, modifier = Modifier.size(24.dp)) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = "Close",
+                                tint = TextSecondary
+                            )
+                        }
+                    }
+
+                    if (entries.isEmpty()) {
+                        Box(
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 24.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "No World Cup has taken place yet.",
+                                fontSize = 13.sp,
+                                color = TextSecondary,
+                                textAlign = TextAlign.Center
+                            )
+                        }
+                    } else {
+                        LazyColumn(
+                            modifier = Modifier.fillMaxWidth().heightIn(max = 300.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            items(entries.size) { idx ->
+                                val entry = entries[idx]
+                                val parts = entry.split(":")
+                                val seasonNum = parts.getOrNull(0)?.toIntOrNull() ?: 1
+                                val nationCode = parts.getOrNull(1) ?: ""
+                                val year = com.example.data.seasonDisplayStartYear(seasonNum)
+                                val nation = com.example.data.nationByCode(nationCode)
+                                val nationName = nation?.name ?: nationCode
+
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(DarkSlate)
+                                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.EmojiEvents,
+                                            contentDescription = null,
+                                            tint = TrophyGold,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                        Text(
+                                            text = "$year World Cup",
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 13.sp,
+                                            color = TextPrimary
+                                        )
+                                    }
+                                    Text(
+                                        text = nationName,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 13.sp,
+                                        color = PitchGreen
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    Button(
+                        onClick = { showPastWinnersDialog = false },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(containerColor = DarkSlate),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Text("Close", color = TextPrimary)
                     }
                 }
             }

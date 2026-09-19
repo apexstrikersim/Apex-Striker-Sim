@@ -183,7 +183,18 @@ data class PlayerEntity(
     var pendingNewManagerNotice: Boolean = false,
     var isGodMode: Boolean = false,
     var lastGoalMilestonePosted: Int = 0,
-    var faceDescriptor: String = ""
+    var faceDescriptor: String = "",
+    var nationalTeamCode: String? = null,
+    var nationalTeamCaps: Int = 0,
+    var recentMatchRatings: String = "",
+    var residencyDaysByCountry: String = "",
+    var lastNationalCallUpSeason: Int? = null,
+    var currentNationalForm: Float = 0.0f,
+    var finishingCeiling: Int = 99,
+    var paceCeiling: Int = 99,
+    var passingCeiling: Int = 99,
+    var physicalCeiling: Int = 99,
+    var techniqueCeiling: Int = 99
 ) {
     val professionalName: String
         get() = if (lastName.isNotBlank()) lastName else name.split(" ").lastOrNull() ?: name
@@ -259,7 +270,8 @@ data class LegacyEntity(
     val isCompleted: Boolean = false,
     val retirementDescription: String = "",
     val faceDescriptor: String = "",
-    val finalAge: Int = 0
+    val finalAge: Int = 0,
+    val nationalTeamCode: String? = null
 )
 
 @Entity(tableName = "game_state")
@@ -312,7 +324,28 @@ data class GameStateEntity(
     var persistedSeniorYouthOffers: String? = null,
     var youthCareerEnded: Boolean = false,
     var recentChoiceEventIds: String = "",
-    var pendingSeasonSummaryJson: String? = null
+    var pendingSeasonSummaryJson: String? = null,
+    var pendingCallUpNationCode: String? = null,
+    var pendingCallUpIsWorldCup: Boolean = false,
+    var worldCupWinnersHistory: String = ""
+)
+
+@Entity(tableName = "nation_call_up_state")
+data class NationCallUpState(
+    @PrimaryKey(autoGenerate = true) val id: Int = 0,
+    val playerName: String,
+    val generation: Int,
+    val nationCode: String,
+    var declineCount: Int = 0,             // 0-3
+    var cooldownUntilSeason: Int = 0,       // season number the nation may next offer; 0 = no cooldown
+    var permanentlyStopped: Boolean = false // true after 3rd decline
+)
+
+@Entity(tableName = "nation_ranking_state")
+data class NationRankingState(
+    @PrimaryKey val nationCode: String,
+    var currentRankingPoints: Int,
+    var lastFullSimSeason: Int = 0   // last season this nation got full-sim treatment; 0 = never
 )
 
 @Entity(tableName = "used_names", indices = [Index(value = ["name"], unique = true)])
@@ -376,8 +409,17 @@ data class PlayerSeasonRecordEntity(
 
 const val CAREER_START_YEAR = 2026
 
+fun seasonDisplayStartYear(seasonNumber: Int): Int {
+    return CAREER_START_YEAR + (seasonNumber - 1)
+}
+
+fun isWorldCupSeason(seasonNumber: Int): Boolean {
+    val year = seasonDisplayStartYear(seasonNumber)
+    return year >= 2030 && (year - 2030) % 4 == 0
+}
+
 fun formatSeasonYear(seasonNumber: Int): String {
-    val startYear = 2025 + seasonNumber
+    val startYear = seasonDisplayStartYear(seasonNumber)
     val endYearSuffix = (startYear + 1) % 100
     return "$startYear/${if (endYearSuffix < 10) "0$endYearSuffix" else endYearSuffix}"
 }

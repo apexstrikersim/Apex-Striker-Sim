@@ -9,8 +9,6 @@ import androidx.room.Query
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.Update
-import androidx.room.migration.Migration
-import androidx.sqlite.db.SupportSQLiteDatabase
 import kotlinx.coroutines.flow.Flow
 
 @Dao
@@ -86,6 +84,9 @@ interface CareerDao {
     @Query("SELECT * FROM fixtures")
     suspend fun getAllFixturesSync(): List<FixtureEntity>
 
+    @Query("SELECT * FROM fixtures WHERE competition = 'LEAGUE' AND isSimulated = 1")
+    suspend fun getSeasonLeagueFixturesSync(): List<FixtureEntity>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertFixtures(fixtures: List<FixtureEntity>)
 
@@ -108,6 +109,9 @@ interface CareerDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertTrophy(trophy: TrophyEntity)
 
+    @Query("SELECT * FROM trophies WHERE playerName = :playerName AND generation = :generation AND seasonYear = :seasonYear AND competitionName = :competitionName LIMIT 1")
+    suspend fun findTrophy(playerName: String, generation: Int, seasonYear: Int, competitionName: String): TrophyEntity?
+
     @Query("DELETE FROM trophies")
     suspend fun clearTrophies()
 
@@ -117,6 +121,9 @@ interface CareerDao {
 
     @Query("SELECT * FROM legacies ORDER BY generation ASC")
     suspend fun getAllLegaciesSync(): List<LegacyEntity>
+
+    @Query("SELECT * FROM legacies WHERE generation = :generation LIMIT 1")
+    suspend fun getLegacyByGeneration(generation: Int): LegacyEntity?
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertLegacy(legacy: LegacyEntity)
@@ -343,6 +350,26 @@ interface CareerDao {
 
     @Query("DELETE FROM npc_managers")
     suspend fun clearNpcManagers()
+
+    // Nation Call-Up State
+    @Query("SELECT * FROM nation_call_up_state WHERE playerName = :playerName AND generation = :generation")
+    suspend fun getCallUpStateForPlayer(playerName: String, generation: Int): List<NationCallUpState>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertCallUpState(state: NationCallUpState)
+
+    // Nation Ranking State
+    @Query("SELECT * FROM nation_ranking_state WHERE nationCode IN (:codes)")
+    suspend fun getRankingStateForCodes(codes: List<String>): List<NationRankingState>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertRankingState(state: NationRankingState)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertRankingStates(states: List<NationRankingState>)
+
+    @Query("SELECT * FROM nation_ranking_state ORDER BY currentRankingPoints DESC")
+    suspend fun getAllRankingStateSync(): List<NationRankingState>
 }
 
 @Database(
@@ -365,7 +392,9 @@ interface CareerDao {
         PlayerSeasonRecordEntity::class,
         SocialPostEntity::class,
         NpcStrikerEntity::class,
-        NpcManagerEntity::class
+        NpcManagerEntity::class,
+        NationCallUpState::class,
+        NationRankingState::class
     ],
     version = AppVersion.CURRENT,
     exportSchema = false
@@ -377,478 +406,69 @@ abstract class AppDatabase : RoomDatabase() {
         @Volatile
         private var INSTANCE: AppDatabase? = null
 
-        val MIGRATION_2_3 = object : Migration(2, 3) {
-            override fun migrate(db: SupportSQLiteDatabase) {
-                db.execSQL("ALTER TABLE players ADD COLUMN fatigue INTEGER NOT NULL DEFAULT 0")
-            }
-        }
-
-        val MIGRATION_3_4 = object : Migration(3, 4) {
-            override fun migrate(db: SupportSQLiteDatabase) {
-                // Check if the column already exists (pre-existing schema vs new migration)
-                try {
-                    db.execSQL("ALTER TABLE fixtures ADD COLUMN playerRating REAL")
-                } catch (e: Exception) {
-                    // Ignored if column already exists
-                }
-            }
-        }
-
-        val MIGRATION_4_5 = object : Migration(4, 5) {
-            override fun migrate(db: SupportSQLiteDatabase) {
-                try {
-                    db.execSQL("ALTER TABLE players ADD COLUMN overtrainingRisk INTEGER NOT NULL DEFAULT 0")
-                } catch (e: Exception) {}
-                try {
-                    db.execSQL("ALTER TABLE players ADD COLUMN hasTrainedThisMonth INTEGER NOT NULL DEFAULT 0")
-                } catch (e: Exception) {}
-                try {
-                    db.execSQL("ALTER TABLE players ADD COLUMN finishingTrainingBonus REAL NOT NULL DEFAULT 0.0")
-                } catch (e: Exception) {}
-                try {
-                    db.execSQL("ALTER TABLE players ADD COLUMN paceTrainingBonus REAL NOT NULL DEFAULT 0.0")
-                } catch (e: Exception) {}
-                try {
-                    db.execSQL("ALTER TABLE players ADD COLUMN passingTrainingBonus REAL NOT NULL DEFAULT 0.0")
-                } catch (e: Exception) {}
-                try {
-                    db.execSQL("ALTER TABLE players ADD COLUMN physicalTrainingBonus REAL NOT NULL DEFAULT 0.0")
-                } catch (e: Exception) {}
-                try {
-                    db.execSQL("ALTER TABLE players ADD COLUMN techniqueTrainingBonus REAL NOT NULL DEFAULT 0.0")
-                } catch (e: Exception) {}
-            }
-        }
-
-        val MIGRATION_5_6 = object : Migration(5, 6) {
-            override fun migrate(db: SupportSQLiteDatabase) {
-                try {
-                    db.execSQL("ALTER TABLE players ADD COLUMN morale INTEGER NOT NULL DEFAULT 50")
-                } catch (e: Exception) {}
-                try {
-                    db.execSQL("ALTER TABLE players ADD COLUMN fanReputation INTEGER NOT NULL DEFAULT 50")
-                } catch (e: Exception) {}
-                try {
-                    db.execSQL("ALTER TABLE players ADD COLUMN managerTrust INTEGER NOT NULL DEFAULT 50")
-                } catch (e: Exception) {}
-                try {
-                    db.execSQL("ALTER TABLE players ADD COLUMN rivalRelationship INTEGER NOT NULL DEFAULT 50")
-                } catch (e: Exception) {}
-            }
-        }
-
-        val MIGRATION_6_7 = object : Migration(6, 7) {
-            override fun migrate(db: SupportSQLiteDatabase) {
-                try {
-                    db.execSQL("ALTER TABLE players ADD COLUMN activePromiseGoalsAssists INTEGER DEFAULT NULL")
-                } catch (e: Exception) {}
-                try {
-                    db.execSQL("ALTER TABLE players ADD COLUMN activePromiseGamesRemaining INTEGER DEFAULT NULL")
-                } catch (e: Exception) {}
-                
-                val gameStateAlters = listOf(
-                    "ALTER TABLE game_state ADD COLUMN activeChoiceOption3 TEXT DEFAULT NULL",
-                    "ALTER TABLE game_state ADD COLUMN activeChoiceFormMod3 INTEGER NOT NULL DEFAULT 0",
-                    "ALTER TABLE game_state ADD COLUMN activeChoiceFinishingMod3 INTEGER NOT NULL DEFAULT 0",
-                    "ALTER TABLE game_state ADD COLUMN activeChoiceTechniqueMod3 INTEGER NOT NULL DEFAULT 0",
-                    "ALTER TABLE game_state ADD COLUMN activeChoiceOutcome3 TEXT DEFAULT NULL",
-                    
-                    "ALTER TABLE game_state ADD COLUMN activeChoiceMoraleMod1 INTEGER NOT NULL DEFAULT 0",
-                    "ALTER TABLE game_state ADD COLUMN activeChoiceFanRepMod1 INTEGER NOT NULL DEFAULT 0",
-                    "ALTER TABLE game_state ADD COLUMN activeChoiceManagerTrustMod1 INTEGER NOT NULL DEFAULT 0",
-                    "ALTER TABLE game_state ADD COLUMN activeChoiceRivalRelMod1 INTEGER NOT NULL DEFAULT 0",
-                    "ALTER TABLE game_state ADD COLUMN activeChoiceFatigueMod1 INTEGER NOT NULL DEFAULT 0",
-                    
-                    "ALTER TABLE game_state ADD COLUMN activeChoiceMoraleMod2 INTEGER NOT NULL DEFAULT 0",
-                    "ALTER TABLE game_state ADD COLUMN activeChoiceFanRepMod2 INTEGER NOT NULL DEFAULT 0",
-                    "ALTER TABLE game_state ADD COLUMN activeChoiceManagerTrustMod2 INTEGER NOT NULL DEFAULT 0",
-                    "ALTER TABLE game_state ADD COLUMN activeChoiceRivalRelMod2 INTEGER NOT NULL DEFAULT 0",
-                    "ALTER TABLE game_state ADD COLUMN activeChoiceFatigueMod2 INTEGER NOT NULL DEFAULT 0",
-                    
-                    "ALTER TABLE game_state ADD COLUMN activeChoiceMoraleMod3 INTEGER NOT NULL DEFAULT 0",
-                    "ALTER TABLE game_state ADD COLUMN activeChoiceFanRepMod3 INTEGER NOT NULL DEFAULT 0",
-                    "ALTER TABLE game_state ADD COLUMN activeChoiceManagerTrustMod3 INTEGER NOT NULL DEFAULT 0",
-                    "ALTER TABLE game_state ADD COLUMN activeChoiceRivalRelMod3 INTEGER NOT NULL DEFAULT 0",
-                    "ALTER TABLE game_state ADD COLUMN activeChoiceFatigueMod3 INTEGER NOT NULL DEFAULT 0"
-                )
-                for (alter in gameStateAlters) {
-                    try {
-                        db.execSQL(alter)
-                    } catch (e: Exception) {}
-                }
-            }
-        }
-
-        val MIGRATION_7_8 = object : Migration(7, 8) {
-            override fun migrate(db: SupportSQLiteDatabase) {
-                try {
-                    db.execSQL("ALTER TABLE players ADD COLUMN hasTransferredThisWindow INTEGER NOT NULL DEFAULT 0")
-                } catch (e: Exception) {}
-                try {
-                    db.execSQL("ALTER TABLE game_state ADD COLUMN persistedTransferOffers TEXT DEFAULT NULL")
-                } catch (e: Exception) {}
-                try {
-                    db.execSQL("ALTER TABLE game_state ADD COLUMN managerTalkCooldownMonths INTEGER NOT NULL DEFAULT 0")
-                } catch (e: Exception) {}
-            }
-        }
-
-        val MIGRATION_8_9 = object : Migration(8, 9) {
-            override fun migrate(db: SupportSQLiteDatabase) {
-                try {
-                    db.execSQL("ALTER TABLE fixtures ADD COLUMN wentToExtraTime INTEGER NOT NULL DEFAULT 0")
-                } catch (e: Exception) {}
-                try {
-                    db.execSQL("ALTER TABLE fixtures ADD COLUMN homePens INTEGER DEFAULT NULL")
-                } catch (e: Exception) {}
-                try {
-                    db.execSQL("ALTER TABLE fixtures ADD COLUMN awayPens INTEGER DEFAULT NULL")
-                } catch (e: Exception) {}
-            }
-        }
-
-        val MIGRATION_9_10 = object : Migration(9, 10) {
-            override fun migrate(db: SupportSQLiteDatabase) {
-                try {
-                    db.execSQL("ALTER TABLE fixtures ADD COLUMN goalMinutes TEXT DEFAULT NULL")
-                } catch (e: Exception) {}
-                try {
-                    db.execSQL("ALTER TABLE fixtures ADD COLUMN assistMinutes TEXT DEFAULT NULL")
-                } catch (e: Exception) {}
-            }
-        }
-
-        val MIGRATION_10_11 = object : Migration(10, 11) {
-            override fun migrate(db: SupportSQLiteDatabase) {
-                // UsedNameEntity
-                db.execSQL("CREATE TABLE IF NOT EXISTS used_names (name TEXT NOT NULL, PRIMARY KEY(name))")
-                
-                // ClubEntity modifications
-                try {
-                    db.execSQL("ALTER TABLE clubs ADD COLUMN description TEXT NOT NULL DEFAULT ''")
-                } catch (e: Exception) {}
-                try {
-                    db.execSQL("ALTER TABLE clubs ADD COLUMN foundedSeasonsAgo INTEGER NOT NULL DEFAULT 0")
-                } catch (e: Exception) {}
-                
-                // ClubSeasonHistoryEntity
-                db.execSQL("CREATE TABLE IF NOT EXISTS club_season_history (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, seasonNumber INTEGER NOT NULL, country TEXT NOT NULL, clubId INTEGER NOT NULL, leagueFinishPosition INTEGER NOT NULL, europeanRank TEXT NOT NULL, superCupResult TEXT NOT NULL)")
-                
-                // PlayerEntity modifications
-                try {
-                    db.execSQL("ALTER TABLE players ADD COLUMN clubGamesPlayed INTEGER NOT NULL DEFAULT 0")
-                } catch (e: Exception) {}
-                try {
-                    db.execSQL("ALTER TABLE players ADD COLUMN clubGoals INTEGER NOT NULL DEFAULT 0")
-                } catch (e: Exception) {}
-                try {
-                    db.execSQL("ALTER TABLE players ADD COLUMN clubAssists INTEGER NOT NULL DEFAULT 0")
-                } catch (e: Exception) {}
-                
-                // ClubRecordEntity
-                db.execSQL("CREATE TABLE IF NOT EXISTS club_records (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, clubId INTEGER NOT NULL, category TEXT NOT NULL, holderName TEXT NOT NULL, statValue INTEGER NOT NULL, isActive INTEGER NOT NULL, yearsActive TEXT NOT NULL, isUserPlayer INTEGER NOT NULL, generation INTEGER, previousHolderName TEXT, previousStatValue INTEGER, previousYearsActive TEXT)")
-            }
-        }
-
-        val MIGRATION_11_12 = object : Migration(11, 12) {
-            override fun migrate(db: SupportSQLiteDatabase) {
-                db.execSQL("CREATE TABLE IF NOT EXISTS player_club_stints (playerName TEXT NOT NULL, generation INTEGER NOT NULL, clubId INTEGER NOT NULL, goals INTEGER NOT NULL, assists INTEGER NOT NULL, gamesPlayed INTEGER NOT NULL, PRIMARY KEY(playerName, generation, clubId))")
-            }
-        }
-
-        val MIGRATION_12_13 = object : Migration(12, 13) {
-            override fun migrate(db: SupportSQLiteDatabase) {
-                try {
-                    db.execSQL("ALTER TABLE fixtures ADD COLUMN playerSubbedOffMinute INTEGER DEFAULT NULL")
-                } catch (e: Exception) {}
-            }
-        }
-
-        val MIGRATION_13_14 = object : Migration(13, 14) {
-            override fun migrate(db: SupportSQLiteDatabase) {
-                db.execSQL("CREATE TABLE IF NOT EXISTS youth_academies (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, parentClubId INTEGER NOT NULL, academyName TEXT NOT NULL, country TEXT NOT NULL, parentReputation TEXT NOT NULL, parentReputationPoints INTEGER NOT NULL, minScoutOvr INTEGER NOT NULL, youthRivalName TEXT NOT NULL, youthRivalOvr INTEGER NOT NULL)")
-                db.execSQL("CREATE TABLE IF NOT EXISTS youth_standings (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, academyId INTEGER NOT NULL, played INTEGER NOT NULL DEFAULT 0, wins INTEGER NOT NULL DEFAULT 0, draws INTEGER NOT NULL DEFAULT 0, losses INTEGER NOT NULL DEFAULT 0, goalsFor INTEGER NOT NULL DEFAULT 0, goalsAgainst INTEGER NOT NULL DEFAULT 0, points INTEGER NOT NULL DEFAULT 0)")
-                db.execSQL("CREATE TABLE IF NOT EXISTS youth_fixtures (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, monthIndex INTEGER NOT NULL, homeAcademyId INTEGER NOT NULL, awayAcademyId INTEGER NOT NULL, homeScore INTEGER DEFAULT NULL, awayScore INTEGER DEFAULT NULL, isSimulated INTEGER NOT NULL DEFAULT 0, playerGoals INTEGER NOT NULL DEFAULT 0, playerAssists INTEGER NOT NULL DEFAULT 0, playerMvp INTEGER NOT NULL DEFAULT 0, playerCameOnMinute INTEGER DEFAULT NULL)")
-                db.execSQL("CREATE TABLE IF NOT EXISTS street_football_games (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, seasonNumber INTEGER NOT NULL, monthIndex INTEGER NOT NULL, opponentName TEXT NOT NULL, playerGoals INTEGER NOT NULL DEFAULT 0, playerAssists INTEGER NOT NULL DEFAULT 0, playerMvp INTEGER NOT NULL DEFAULT 0, resultSummary TEXT NOT NULL DEFAULT '')")
-
-                val playerCols = listOf(
-                    "ALTER TABLE players ADD COLUMN careerPhase TEXT NOT NULL DEFAULT 'STREET_FOOTBALL'",
-                    "ALTER TABLE players ADD COLUMN currentAcademyId INTEGER DEFAULT NULL",
-                    "ALTER TABLE players ADD COLUMN rejectedAcademyIds TEXT NOT NULL DEFAULT ''",
-                    "ALTER TABLE players ADD COLUMN rejectedSeniorClubIds TEXT NOT NULL DEFAULT ''",
-                    "ALTER TABLE players ADD COLUMN youthGoals INTEGER NOT NULL DEFAULT 0",
-                    "ALTER TABLE players ADD COLUMN youthAssists INTEGER NOT NULL DEFAULT 0",
-                    "ALTER TABLE players ADD COLUMN youthMvps INTEGER NOT NULL DEFAULT 0",
-                    "ALTER TABLE players ADD COLUMN youthGamesPlayed INTEGER NOT NULL DEFAULT 0",
-                    "ALTER TABLE players ADD COLUMN shootingDrillsCompleted INTEGER NOT NULL DEFAULT 0",
-                    "ALTER TABLE players ADD COLUMN passingDrillsCompleted INTEGER NOT NULL DEFAULT 0",
-                    "ALTER TABLE players ADD COLUMN paceDrillsCompleted INTEGER NOT NULL DEFAULT 0",
-                    "ALTER TABLE players ADD COLUMN technicalDrillsCompleted INTEGER NOT NULL DEFAULT 0",
-                    "ALTER TABLE players ADD COLUMN physicalDrillsCompleted INTEGER NOT NULL DEFAULT 0",
-                    "ALTER TABLE players ADD COLUMN assignedPlaystyle TEXT DEFAULT NULL",
-                    "ALTER TABLE players ADD COLUMN assignedWeakness TEXT DEFAULT NULL",
-                    "ALTER TABLE players ADD COLUMN playstyleAssignedAtAge INTEGER DEFAULT NULL",
-                    "ALTER TABLE players ADD COLUMN streetFootballGamesThisSeason INTEGER NOT NULL DEFAULT 0"
-                )
-                for (colSql in playerCols) {
-                    try { db.execSQL(colSql) } catch (e: Exception) {}
-                }
-
-                val gameCols = listOf(
-                    "ALTER TABLE game_state ADD COLUMN persistedYouthOffers TEXT DEFAULT NULL",
-                    "ALTER TABLE game_state ADD COLUMN persistedSeniorYouthOffers TEXT DEFAULT NULL",
-                    "ALTER TABLE game_state ADD COLUMN youthCareerEnded INTEGER NOT NULL DEFAULT 0"
-                )
-                for (colSql in gameCols) {
-                    try { db.execSQL(colSql) } catch (e: Exception) {}
-                }
-            }
-        }
-
-        val MIGRATION_14_15 = object : Migration(14, 15) {
-            override fun migrate(db: SupportSQLiteDatabase) {
-                val playerCols = listOf(
-                    "ALTER TABLE players ADD COLUMN preferredFoot TEXT NOT NULL DEFAULT 'Right'",
-                    "ALTER TABLE players ADD COLUMN squadNumber INTEGER NOT NULL DEFAULT 9",
-                    "ALTER TABLE players ADD COLUMN backgroundStory TEXT NOT NULL DEFAULT 'Street Cages'"
-                )
-                for (colSql in playerCols) {
-                    try { db.execSQL(colSql) } catch (e: Exception) {}
-                }
-            }
-        }
-
-        val MIGRATION_15_16 = object : Migration(15, 16) {
-            override fun migrate(db: SupportSQLiteDatabase) {
-                try {
-                    db.execSQL("ALTER TABLE players ADD COLUMN potentialCeiling INTEGER NOT NULL DEFAULT 99")
-                } catch (e: Exception) {}
-            }
-        }
-
-        val MIGRATION_16_17 = object : Migration(16, 17) {
-            override fun migrate(db: SupportSQLiteDatabase) {
-                try {
-                    db.execSQL("ALTER TABLE game_state ADD COLUMN recentChoiceEventIds TEXT NOT NULL DEFAULT ''")
-                } catch (e: Exception) {}
-            }
-        }
-
-        val MIGRATION_17_18 = object : Migration(17, 18) {
-            override fun migrate(db: SupportSQLiteDatabase) {
-                try { db.execSQL("CREATE INDEX IF NOT EXISTS index_fixtures_monthIndex ON fixtures(monthIndex)") } catch (e: Exception) {}
-                try { db.execSQL("CREATE INDEX IF NOT EXISTS index_standings_country ON standings(country)") } catch (e: Exception) {}
-                try { db.execSQL("CREATE INDEX IF NOT EXISTS index_youth_fixtures_monthIndex ON youth_fixtures(monthIndex)") } catch (e: Exception) {}
-                try { db.execSQL("CREATE INDEX IF NOT EXISTS index_club_season_history_clubId ON club_season_history(clubId)") } catch (e: Exception) {}
-                try { db.execSQL("CREATE INDEX IF NOT EXISTS index_club_records_clubId ON club_records(clubId)") } catch (e: Exception) {}
-                try { db.execSQL("CREATE INDEX IF NOT EXISTS index_trophies_playerName_generation_clubName ON trophies(playerName, generation, clubName)") } catch (e: Exception) {}
-                try { db.execSQL("CREATE INDEX IF NOT EXISTS index_trophies_clubName ON trophies(clubName)") } catch (e: Exception) {}
-                try { db.execSQL("CREATE INDEX IF NOT EXISTS index_player_club_stints_playerName_generation ON player_club_stints(playerName, generation)") } catch (e: Exception) {}
-                try { db.execSQL("CREATE INDEX IF NOT EXISTS index_street_football_games_seasonNumber ON street_football_games(seasonNumber)") } catch (e: Exception) {}
-                try { db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_used_names_name ON used_names(name)") } catch (e: Exception) {}
-            }
-        }
-
-        val MIGRATION_18_19 = object : Migration(18, 19) {
-            override fun migrate(db: SupportSQLiteDatabase) {
-                db.execSQL("""
-                    CREATE TABLE IF NOT EXISTS `player_season_records` (
-                        `id` INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
-                        `playerName` TEXT NOT NULL,
-                        `generation` INTEGER NOT NULL,
-                        `seasonNumber` INTEGER NOT NULL,
-                        `clubName` TEXT NOT NULL,
-                        `matchesPlayed` INTEGER NOT NULL,
-                        `goals` INTEGER NOT NULL,
-                        `assists` INTEGER NOT NULL,
-                        `ovrAtSeasonEnd` INTEGER NOT NULL
-                    )
-                """)
-                db.execSQL("CREATE INDEX IF NOT EXISTS `index_player_season_records_playerName_generation` ON `player_season_records` (`playerName`, `generation`)")
-            }
-        }
-
-        val MIGRATION_19_20 = object : Migration(19, 20) {
-            override fun migrate(db: SupportSQLiteDatabase) {
-                try {
-                    db.execSQL("ALTER TABLE player_season_records ADD COLUMN playerAge INTEGER NOT NULL DEFAULT 0")
-                } catch (e: Exception) {}
-            }
-        }
-
-        val MIGRATION_20_21 = object : Migration(20, 21) {
-            override fun migrate(db: SupportSQLiteDatabase) {
-                try {
-                    db.execSQL("ALTER TABLE legacies ADD COLUMN retirementDescription TEXT NOT NULL DEFAULT ''")
-                } catch (e: Exception) {}
-            }
-        }
-
-        val MIGRATION_21_22 = object : Migration(21, 22) {
-            override fun migrate(db: SupportSQLiteDatabase) {
-                db.execSQL("""
-                    CREATE TABLE IF NOT EXISTS social_posts (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-                        sequenceIndex INTEGER NOT NULL,
-                        seasonNumber INTEGER NOT NULL,
-                        monthIndex INTEGER NOT NULL,
-                        postType TEXT NOT NULL,
-                        authorName TEXT NOT NULL,
-                        authorHandle TEXT NOT NULL,
-                        authorInitials TEXT NOT NULL,
-                        content TEXT NOT NULL,
-                        isAboutPlayerOrClub INTEGER NOT NULL,
-                        relatedClubId INTEGER,
-                        likeCount INTEGER NOT NULL,
-                        isReplyable INTEGER NOT NULL DEFAULT 0,
-                        hasReplied INTEGER NOT NULL DEFAULT 0,
-                        selectedReplyIndex INTEGER,
-                        reply1Text TEXT, reply1MoraleMod INTEGER NOT NULL DEFAULT 0, reply1FanRepMod INTEGER NOT NULL DEFAULT 0, reply1ManagerTrustMod INTEGER NOT NULL DEFAULT 0, reply1RivalRelMod INTEGER NOT NULL DEFAULT 0,
-                        reply2Text TEXT, reply2MoraleMod INTEGER NOT NULL DEFAULT 0, reply2FanRepMod INTEGER NOT NULL DEFAULT 0, reply2ManagerTrustMod INTEGER NOT NULL DEFAULT 0, reply2RivalRelMod INTEGER NOT NULL DEFAULT 0,
-                        reply3Text TEXT, reply3MoraleMod INTEGER NOT NULL DEFAULT 0, reply3FanRepMod INTEGER NOT NULL DEFAULT 0, reply3ManagerTrustMod INTEGER NOT NULL DEFAULT 0, reply3RivalRelMod INTEGER NOT NULL DEFAULT 0
-                    )
-                """)
-                db.execSQL("CREATE INDEX IF NOT EXISTS index_social_posts_sequenceIndex ON social_posts(sequenceIndex)")
-            }
-        }
-
-        val MIGRATION_22_23 = object : Migration(22, 23) {
-            override fun migrate(db: SupportSQLiteDatabase) {
-                try {
-                    db.execSQL("ALTER TABLE clubs ADD COLUMN momentumBias REAL NOT NULL DEFAULT 0")
-                } catch (e: Exception) {}
-                try {
-                    db.execSQL("ALTER TABLE clubs ADD COLUMN trajectorySeasonsRemaining INTEGER NOT NULL DEFAULT 0")
-                } catch (e: Exception) {}
-            }
-        }
-
-        val MIGRATION_23_24 = object : Migration(23, 24) {
-            override fun migrate(db: SupportSQLiteDatabase) {
-                try {
-                    db.execSQL("""
-                        CREATE TABLE IF NOT EXISTS npc_strikers (
-                            id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-                            name TEXT NOT NULL,
-                            country TEXT NOT NULL,
-                            currentClubId INTEGER,
-                            age INTEGER NOT NULL,
-                            ovr INTEGER NOT NULL,
-                            potentialCeiling INTEGER NOT NULL,
-                            seasonsAtCurrentClub INTEGER NOT NULL DEFAULT 0,
-                            isRetired INTEGER NOT NULL DEFAULT 0,
-                            isRisingTalent INTEGER NOT NULL DEFAULT 0
-                        )
-                    """)
-                    db.execSQL("CREATE INDEX IF NOT EXISTS index_npc_strikers_currentClubId ON npc_strikers(currentClubId)")
-                } catch (e: Exception) {}
-
-                try {
-                    db.execSQL("""
-                        CREATE TABLE IF NOT EXISTS npc_managers (
-                            id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-                            name TEXT NOT NULL,
-                            country TEXT NOT NULL,
-                            currentClubId INTEGER,
-                            reputationTier TEXT NOT NULL,
-                            seasonsAtCurrentClub INTEGER NOT NULL DEFAULT 0,
-                            seasonsAsManager INTEGER NOT NULL DEFAULT 0,
-                            isRetired INTEGER NOT NULL DEFAULT 0
-                        )
-                    """)
-                    db.execSQL("CREATE INDEX IF NOT EXISTS index_npc_managers_currentClubId ON npc_managers(currentClubId)")
-                } catch (e: Exception) {}
-
-                try {
-                    db.execSQL("ALTER TABLE clubs ADD COLUMN managerName TEXT NOT NULL DEFAULT ''")
-                } catch (e: Exception) {}
-
-                try {
-                    db.execSQL("ALTER TABLE clubs ADD COLUMN managerReputationTier TEXT NOT NULL DEFAULT 'MID'")
-                } catch (e: Exception) {}
-
-                try {
-                    db.execSQL("ALTER TABLE clubs ADD COLUMN managerId INTEGER NOT NULL DEFAULT 0")
-                } catch (e: Exception) {}
-
-                try {
-                    db.execSQL("ALTER TABLE players ADD COLUMN pendingNewManagerNotice INTEGER NOT NULL DEFAULT 0")
-                } catch (e: Exception) {}
-            }
-        }
-
-        val MIGRATION_24_25 = object : Migration(24, 25) {
-            override fun migrate(db: SupportSQLiteDatabase) {
-                try {
-                    db.execSQL("ALTER TABLE players ADD COLUMN isGodMode INTEGER NOT NULL DEFAULT 0")
-                } catch (e: Exception) {}
-                try {
-                    db.execSQL("ALTER TABLE players ADD COLUMN lastGoalMilestonePosted INTEGER NOT NULL DEFAULT 0")
-                } catch (e: Exception) {}
-            }
-        }
-
-        val MIGRATION_25_26 = object : Migration(25, 26) {
-            override fun migrate(db: SupportSQLiteDatabase) {
-                // No schema change this version — bump kept in lockstep with AppVersion.CURRENT per policy.
-            }
-        }
-
-        val MIGRATION_26_27 = object : Migration(26, 27) {
-            override fun migrate(db: SupportSQLiteDatabase) {
-                try {
-                    db.execSQL("ALTER TABLE players ADD COLUMN faceDescriptor TEXT NOT NULL DEFAULT ''")
-                } catch (e: Exception) {}
-                try {
-                    db.execSQL("ALTER TABLE legacies ADD COLUMN faceDescriptor TEXT NOT NULL DEFAULT ''")
-                } catch (e: Exception) {}
-                try {
-                    db.execSQL("ALTER TABLE legacies ADD COLUMN finalAge INTEGER NOT NULL DEFAULT 0")
-                } catch (e: Exception) {}
-            }
-        }
-
-        val MIGRATION_27_28 = object : Migration(27, 28) {
-            override fun migrate(db: SupportSQLiteDatabase) {
-                try {
-                    db.execSQL("ALTER TABLE players ADD COLUMN firstName TEXT NOT NULL DEFAULT ''")
-                } catch (e: Exception) {}
-                try {
-                    db.execSQL("ALTER TABLE players ADD COLUMN lastName TEXT NOT NULL DEFAULT ''")
-                } catch (e: Exception) {}
-                try {
-                    db.execSQL("ALTER TABLE players ADD COLUMN revealedPotentialCeiling INTEGER NOT NULL DEFAULT 0")
-                } catch (e: Exception) {}
-                try {
-                    db.execSQL("ALTER TABLE social_posts ADD COLUMN replyableUntilSequenceIndex INTEGER")
-                } catch (e: Exception) {}
-                try {
-                    db.execSQL("ALTER TABLE game_state ADD COLUMN pendingSeasonSummaryJson TEXT")
-                } catch (e: Exception) {}
-                try {
-                    db.execSQL("UPDATE players SET firstName = CASE WHEN INSTR(name, ' ') > 0 THEN SUBSTR(name, 1, INSTR(name, ' ') - 1) ELSE name END WHERE firstName = '' AND name != ''")
-                    db.execSQL("UPDATE players SET lastName = CASE WHEN INSTR(name, ' ') > 0 THEN SUBSTR(name, INSTR(name, ' ') + 1) ELSE '' END WHERE lastName = '' AND name != ''")
-                } catch (e: Exception) {}
-            }
-        }
-
         private val instances = mutableMapOf<Int, AppDatabase>()
+        private val checkedSlots = mutableSetOf<Int>()
 
         fun getDatabase(context: Context, slotId: Int = 1): AppDatabase {
-            SaveSlotManager(context).migrateLegacyDatabaseIfNeeded(context)
             return synchronized(this) {
-                instances.getOrPut(slotId) {
-                    Room.databaseBuilder(
-                        context.applicationContext,
-                        AppDatabase::class.java,
-                        "apex_career_slot_$slotId.db"
-                    )
-                    .addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17, MIGRATION_17_18, MIGRATION_18_19, MIGRATION_19_20, MIGRATION_20_21, MIGRATION_21_22, MIGRATION_22_23, MIGRATION_23_24, MIGRATION_24_25, MIGRATION_25_26, MIGRATION_26_27, MIGRATION_27_28)
-                    .fallbackToDestructiveMigration()
-                    .fallbackToDestructiveMigrationOnDowngrade()
-                    .build()
+                instances[slotId]?.let { return it }
+
+                SaveSlotManager(context).migrateLegacyDatabaseIfNeeded(context)
+                if (checkedSlots.add(slotId)) {
+                    reconcileStaleDatabaseIfNeeded(context, slotId)
                 }
+
+                val db = Room.databaseBuilder(
+                    context.applicationContext,
+                    AppDatabase::class.java,
+                    "apex_career_slot_$slotId.db"
+                )
+                .setJournalMode(JournalMode.WRITE_AHEAD_LOGGING)
+                .fallbackToDestructiveMigration()
+                .fallbackToDestructiveMigrationOnDowngrade()
+                .build()
+
+                instances[slotId] = db
+                db
             }
+        }
+
+        fun closeDatabase(slotId: Int) {
+            synchronized(this) {
+                try {
+                    instances.remove(slotId)?.close()
+                } catch (_: Exception) {}
+                checkedSlots.remove(slotId)
+            }
+        }
+
+        private fun reconcileStaleDatabaseIfNeeded(context: Context, slotId: Int) {
+            try {
+                val dbFile = context.getDatabasePath("apex_career_slot_$slotId.db")
+                if (dbFile.exists()) {
+                    var diskHash: String? = null
+                    try {
+                        val sqlite = android.database.sqlite.SQLiteDatabase.openDatabase(
+                            dbFile.path,
+                            null,
+                            android.database.sqlite.SQLiteDatabase.OPEN_READONLY
+                        )
+                        try {
+                            sqlite.rawQuery("SELECT identity_hash FROM room_master_table WHERE id = 42 LIMIT 1", null).use { cursor ->
+                                if (cursor.moveToFirst()) {
+                                    diskHash = cursor.getString(0)
+                                }
+                            }
+                        } finally {
+                            sqlite.close()
+                        }
+                    } catch (_: Exception) {}
+
+                    if (diskHash != null && diskHash != "234fa13c6a3b0fa3daae99f15a646e47") {
+                        context.deleteDatabase("apex_career_slot_$slotId.db")
+                    }
+                }
+            } catch (_: Exception) {}
         }
     }
 }

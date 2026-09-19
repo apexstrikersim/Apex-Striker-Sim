@@ -23,5 +23,6 @@ fun ImmersiveDialogEffect() {
 }
 
 internal fun getMonthName(monthIndex: Int): String {
-    return listOf("August", "September", "October", "November", "December", "January", "February", "March", "April", "May")[monthIndex]
+    val months = listOf("August", "September", "October", "November", "December", "January", "February", "March", "April", "May", "June", "July")
+    return if (monthIndex in months.indices) months[monthIndex] else "Month $monthIndex"
 }
