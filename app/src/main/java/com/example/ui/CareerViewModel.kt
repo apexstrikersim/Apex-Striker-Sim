@@ -15,6 +15,9 @@ import com.example.data.TransferOffer
 import com.example.data.FictionalData
 import com.example.data.SaveSlotManager
 import com.example.data.SlotMetadata
+import com.example.ui.tutorial.TutorialStep
+import com.example.ui.tutorial.STREET_TUTORIAL_STEPS
+import com.example.ui.tutorial.PRO_TUTORIAL_STEPS
 import kotlin.math.roundToInt
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -103,6 +106,31 @@ class CareerViewModel(application: Application) : AndroidViewModel(application) 
         _isSocialFeedPlayerOnly.value = only
     }
 
+    private val _activeTutorial = MutableStateFlow<List<com.example.ui.tutorial.TutorialStep>?>(null)
+    val activeTutorial: StateFlow<List<com.example.ui.tutorial.TutorialStep>?> = _activeTutorial.asStateFlow()
+
+    fun dismissTutorial() {
+        val stepsShown = _activeTutorial.value
+        _activeTutorial.value = null
+        if (stepsShown == com.example.ui.tutorial.STREET_TUTORIAL_STEPS) {
+            viewModelScope.launch { repository.markStreetTutorialSeen() }
+        } else if (stepsShown == com.example.ui.tutorial.PRO_TUTORIAL_STEPS) {
+            viewModelScope.launch { repository.markProTutorialSeen() }
+        }
+    }
+
+    private fun checkTutorialTriggers(player: com.example.data.PlayerEntity, gameState: com.example.data.GameStateEntity) {
+        if (_activeTutorial.value != null) return // a tutorial is already showing
+        when (player.careerPhase) {
+            com.example.data.PHASE_STREET -> if (!gameState.hasSeenStreetTutorial) {
+                _activeTutorial.value = com.example.ui.tutorial.STREET_TUTORIAL_STEPS
+            }
+            com.example.data.PHASE_SENIOR -> if (!gameState.hasSeenProTutorial) {
+                _activeTutorial.value = com.example.ui.tutorial.PRO_TUTORIAL_STEPS
+            }
+        }
+    }
+
     private var currentJob: kotlinx.coroutines.Job? = null
 
     private fun reloadStateFromRepository() {
@@ -112,9 +140,26 @@ class CareerViewModel(application: Application) : AndroidViewModel(application) 
             repository.onTrophyUnlockedListener = { trophy -> triggerTrophyAnimation(trophy) }
             repository.migrateClubRecordsIfNeeded()
             repository.restorePendingSeasonSummaryIfNeeded()
-            launch { repository.playerFlow.collect { _playerFlow.value = it; syncSlotMetadata() } }
+            launch {
+                repository.playerFlow.collect { player ->
+                    _playerFlow.value = player
+                    syncSlotMetadata()
+                    val gs = _gameStateFlow.value
+                    if (player != null && gs != null) {
+                        checkTutorialTriggers(player, gs)
+                    }
+                }
+            }
             launch { repository.allClubsFlow.collect { _clubsFlow.value = it } }
-            launch { repository.gameStateFlow.collect { _gameStateFlow.value = it } }
+            launch {
+                repository.gameStateFlow.collect { gs ->
+                    _gameStateFlow.value = gs
+                    val player = _playerFlow.value
+                    if (player != null && gs != null) {
+                        checkTutorialTriggers(player, gs)
+                    }
+                }
+            }
             launch { repository.allTrophiesFlow.collect { _trophiesFlow.value = it } }
             launch { repository.allLegaciesFlow.collect { _legaciesFlow.value = it } }
             launch { repository.allSeasonRecordsFlow.collect { _seasonRecordsFlow.value = it } }

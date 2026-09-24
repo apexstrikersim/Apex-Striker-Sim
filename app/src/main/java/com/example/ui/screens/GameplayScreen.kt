@@ -39,6 +39,8 @@ import com.example.ui.dialogs.SettingsDialog
 import com.example.ui.dialogs.TransferOffersDialog
 import com.example.ui.tabs.*
 import com.example.ui.theme.*
+import com.example.ui.tutorial.tutorialTarget
+import com.example.ui.tutorial.TutorialOverlay
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -76,6 +78,7 @@ fun GameplayScreen(
     val isShowingYouthScout by viewModel.isShowingYouthScoutDialog.collectAsStateWithLifecycle()
     val isShowingSeniorYouthScout by viewModel.isShowingSeniorYouthScoutDialog.collectAsStateWithLifecycle()
     val latestSeasonSummary by viewModel.latestSeasonSummaryFlow.collectAsStateWithLifecycle()
+    val activeTutorial by viewModel.activeTutorial.collectAsStateWithLifecycle()
 
     val hapticFeedback = LocalHapticFeedback.current
     val isHapticEnabled by viewModel.isHapticEnabled.collectAsStateWithLifecycle()
@@ -185,6 +188,13 @@ fun GameplayScreen(
 
                 tabs.forEach { (tab, icon, label) ->
                     val isSelected = selectedTab == tab
+                    val targetId = when (tab) {
+                        GameTab.HOME -> "nav_home"
+                        GameTab.CALENDAR -> "nav_calendar"
+                        GameTab.CLUB -> "nav_club"
+                        GameTab.LEAGUE -> "nav_league"
+                        GameTab.TROPHIES -> "nav_trophies"
+                    }
                     NavigationBarItem(
                         selected = isSelected,
                         onClick = {
@@ -214,7 +224,9 @@ fun GameplayScreen(
                             unselectedIconColor = TextSecondary,
                             unselectedTextColor = TextSecondary
                         ),
-                        modifier = Modifier.testTag("tab_${label.lowercase()}")
+                        modifier = Modifier
+                            .testTag("tab_${label.lowercase()}")
+                            .tutorialTarget(targetId)
                     )
                 }
             }
@@ -357,5 +369,12 @@ fun GameplayScreen(
         isShowingTransfer -> {
             TransferOffersDialog(viewModel)
         }
+    }
+
+    activeTutorial?.let { steps ->
+        TutorialOverlay(
+            steps = steps,
+            onFinished = { viewModel.dismissTutorial() }
+        )
     }
 }

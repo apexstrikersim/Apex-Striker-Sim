@@ -6306,6 +6306,30 @@ private suspend fun adjustClubsReputations(
         gameState.narrativeLog = capNarrativeLog(logMsg + "\n\n" + gameState.narrativeLog)
         dao.updateGameState(gameState)
     }
+
+    suspend fun markStreetTutorialSeen() {
+        val gameState = dao.getGameStateSync() ?: return
+        gameState.hasSeenStreetTutorial = true
+        dao.updateGameState(gameState)
+    }
+
+    suspend fun markProTutorialSeen() {
+        val gameState = dao.getGameStateSync() ?: return
+        gameState.hasSeenProTutorial = true
+        dao.updateGameState(gameState)
+    }
+
+    suspend fun setHasSeenStreetTutorial(seen: Boolean) {
+        val gs = dao.getGameStateSync() ?: return
+        gs.hasSeenStreetTutorial = seen
+        dao.updateGameState(gs)
+    }
+
+    suspend fun setHasSeenProTutorial(seen: Boolean) {
+        val gs = dao.getGameStateSync() ?: return
+        gs.hasSeenProTutorial = seen
+        dao.updateGameState(gs)
+    }
 }
 
 data class RotationResult(

@@ -282,6 +282,8 @@ data class GameStateEntity(
     var narrativeLog: String = "", // BitLife-style logs
     var autoSave: Boolean = true,
     var isDevMode: Boolean = false,
+    var hasSeenStreetTutorial: Boolean = false,
+    var hasSeenProTutorial: Boolean = false,
     var activeChoicePrompt: String? = null,
     var activeChoiceOption1: String? = null,
     var activeChoiceOption2: String? = null,
