@@ -1,9 +1,13 @@
 package com.example.ui.tutorial
 
-import androidx.compose.animation.core.animateFloatAsState
+import android.content.Context
+import android.content.ContextWrapper
+import android.graphics.drawable.ColorDrawable
+import android.view.View
+import android.view.ViewParent
+import android.view.Window
+import android.view.WindowManager
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
@@ -11,21 +15,19 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.BlendMode
-import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.drawscope.Fill
-import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.PathFillType
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.window.DialogWindowProvider
 import com.example.ui.ImmersiveDialogEffect
 
 @Composable
@@ -38,88 +40,156 @@ fun TutorialOverlay(
         onFinished()
         return
     }
-    val targetRect = TutorialTargetRegistry.bounds[currentStep.targetId]
+
+    // Bug 1 Step 1: Reactive read using derivedStateOf to prevent coordinate staleness
+    val targetRect by remember(currentStep.targetId) {
+        derivedStateOf { TutorialTargetRegistry.bounds[currentStep.targetId] }
+    }
 
     Dialog(
         onDismissRequest = { /* not dismissible by back/outside tap, only via Skip button */ },
-        properties = DialogProperties(usePlatformDefaultWidth = false, dismissOnBackPress = false, dismissOnClickOutside = false)
+        properties = DialogProperties(
+            usePlatformDefaultWidth = false,
+            dismissOnBackPress = false,
+            dismissOnClickOutside = false,
+            decorFitsSystemWindows = false
+        )
     ) {
         ImmersiveDialogEffect()
 
+        // Bug 2: Ensure dialog window dim is completely removed only for TutorialOverlay's dialog
+        val view = LocalView.current
+        fun applyDialogWindowConfig(window: Window) {
+            window.clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
+            window.setDimAmount(0f)
+            val lp = window.attributes
+            lp.dimAmount = 0f
+            lp.flags = lp.flags and WindowManager.LayoutParams.FLAG_DIM_BEHIND.inv()
+            window.attributes = lp
+            window.setBackgroundDrawable(ColorDrawable(android.graphics.Color.TRANSPARENT))
+        }
+
+        fun findDialogWindow(v: View): Window? {
+            var p: ViewParent? = v.parent
+            while (p != null) {
+                if (p is DialogWindowProvider) return p.window
+                p = p.parent
+            }
+            var ctx: Context? = v.context
+            while (ctx is ContextWrapper) {
+                if (ctx is DialogWindowProvider) return ctx.window
+                if (ctx is android.app.Dialog) return ctx.window
+                ctx = ctx.baseContext
+            }
+            return null
+        }
+
+        DisposableEffect(view) {
+            findDialogWindow(view)?.let { applyDialogWindowConfig(it) }
+
+            val attachListener = object : View.OnAttachStateChangeListener {
+                override fun onViewAttachedToWindow(v: View) {
+                    findDialogWindow(v)?.let { applyDialogWindowConfig(it) }
+                }
+                override fun onViewDetachedFromWindow(v: View) {}
+            }
+            view.addOnAttachStateChangeListener(attachListener)
+            onDispose {
+                view.removeOnAttachStateChangeListener(attachListener)
+            }
+        }
+
         BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
             val maxHeightPx = constraints.maxHeight.toFloat()
-            // Scrim with cutout
-            Canvas(modifier = Modifier
-                .fillMaxSize()
-                .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
-            ) {
-                drawRect(color = Color.Black.copy(alpha = 0.75f))
+            val density = LocalDensity.current
+            val gapPx = with(density) { 16.dp.toPx() }
+            val cutoutPaddingPx = with(density) { 8.dp.toPx() }
+
+            // Bug 2: Scrim with cutout using PathFillType.EvenOdd so pixels inside cutout are never drawn
+            Canvas(modifier = Modifier.fillMaxSize()) {
                 if (targetRect != null) {
-                    val padding = 8.dp.toPx()
                     val cutout = Rect(
-                        left = targetRect.left - padding,
-                        top = targetRect.top - padding,
-                        right = targetRect.right + padding,
-                        bottom = targetRect.bottom + padding
+                        left = targetRect!!.left - cutoutPaddingPx,
+                        top = targetRect!!.top - cutoutPaddingPx,
+                        right = targetRect!!.right + cutoutPaddingPx,
+                        bottom = targetRect!!.bottom + cutoutPaddingPx
                     )
-                    drawRoundRect(
-                        color = Color.Transparent,
-                        topLeft = Offset(cutout.left, cutout.top),
-                        size = Size(cutout.width, cutout.height),
-                        cornerRadius = CornerRadius(16.dp.toPx()),
-                        blendMode = BlendMode.Clear
-                    )
+                    val path = Path().apply {
+                        fillType = PathFillType.EvenOdd
+                        addRect(Rect(0f, 0f, size.width, size.height))
+                        addRoundRect(
+                            RoundRect(
+                                rect = cutout,
+                                cornerRadius = CornerRadius(16.dp.toPx())
+                            )
+                        )
+                    }
+                    drawPath(path = path, color = Color.Black.copy(alpha = 0.75f))
+                } else {
+                    drawRect(color = Color.Black.copy(alpha = 0.75f))
                 }
             }
 
-            // Tooltip card, positioned below the target if there's room, 
-            // otherwise above it. Falls back to bottom-center if no 
-            // target bounds are available yet (e.g. first frame before 
-            // layout completes).
-            val density = LocalDensity.current
-            val tooltipModifier = if (targetRect != null) {
-                // If target is in the bottom half of the screen (e.g. bottom navigation bar), position card above it
-                val estimatedCardHeightPx = with(density) { 180.dp.toPx() }
-                if (targetRect.bottom + estimatedCardHeightPx > maxHeightPx) {
-                    val bottomPaddingPx = maxHeightPx - targetRect.top + with(density) { 16.dp.toPx() }
-                    Modifier
-                        .align(Alignment.BottomCenter)
-                        .padding(bottom = with(density) { bottomPaddingPx.toDp() }, start = 24.dp, end = 24.dp)
-                } else {
-                    val topPx = targetRect.bottom + with(density) { 16.dp.toPx() }
-                    Modifier
+            // Bug 1 Step 2: Constrain tooltip in a container Box above or below cutout
+            val tooltipContainerModifier: Modifier
+            val tooltipAlignment: Alignment
+            if (targetRect != null) {
+                val cutoutTop = targetRect!!.top - cutoutPaddingPx
+                val cutoutBottom = targetRect!!.bottom + cutoutPaddingPx
+                val spaceBelow = maxHeightPx - cutoutBottom
+                val spaceAbove = cutoutTop
+
+                if (spaceBelow >= spaceAbove) {
+                    tooltipContainerModifier = Modifier
                         .align(Alignment.TopStart)
-                        .offset(y = with(density) { topPx.toDp() })
+                        .offset(y = with(density) { (cutoutBottom + gapPx).toDp() })
+                        .fillMaxWidth()
+                        .heightIn(max = with(density) { (spaceBelow - gapPx).coerceAtLeast(0f).toDp() })
                         .padding(horizontal = 24.dp)
+                    tooltipAlignment = Alignment.TopCenter
+                } else {
+                    tooltipContainerModifier = Modifier
+                        .align(Alignment.TopStart)
+                        .fillMaxWidth()
+                        .height(with(density) { (cutoutTop - gapPx).coerceAtLeast(0f).toDp() })
+                        .padding(horizontal = 24.dp)
+                    tooltipAlignment = Alignment.BottomCenter
                 }
             } else {
-                Modifier
+                tooltipContainerModifier = Modifier
                     .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
                     .padding(24.dp)
+                tooltipAlignment = Alignment.BottomCenter
             }
 
-            Card(
-                modifier = tooltipModifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1E1E))
+            Box(
+                modifier = tooltipContainerModifier,
+                contentAlignment = tooltipAlignment
             ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text(currentStep.title, color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(currentStep.description, color = Color.White.copy(alpha = 0.85f), fontSize = 14.sp)
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        TextButton(onClick = onFinished) {
-                            Text("Skip Tutorial")
-                        }
-                        Button(onClick = {
-                            if (currentIndex < steps.size - 1) currentIndex++ else onFinished()
-                        }) {
-                            Text(if (currentIndex < steps.size - 1) "Next" else "Done")
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1E1E))
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text(currentStep.title, color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(currentStep.description, color = Color.White.copy(alpha = 0.85f), fontSize = 14.sp)
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            TextButton(onClick = onFinished) {
+                                Text("Skip Tutorial")
+                            }
+                            Button(onClick = {
+                                if (currentIndex < steps.size - 1) currentIndex++ else onFinished()
+                            }) {
+                                Text(if (currentIndex < steps.size - 1) "Next" else "Done")
+                            }
                         }
                     }
                 }
