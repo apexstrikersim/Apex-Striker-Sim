@@ -151,8 +151,14 @@ interface CareerDao {
     @Query("SELECT COUNT(*) FROM used_names WHERE name = :name")
     suspend fun checkUsedNameCount(name: String): Int
 
+    @Query("SELECT name FROM used_names")
+    suspend fun getAllUsedNamesSync(): List<String>
+
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertUsedName(usedName: UsedNameEntity)
+
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertUsedNames(usedNames: List<UsedNameEntity>)
 
     @Query("DELETE FROM used_names")
     suspend fun clearUsedNames()
@@ -185,6 +191,9 @@ interface CareerDao {
 
     @Update
     suspend fun updateClubRecord(record: ClubRecordEntity)
+
+    @Update
+    suspend fun updateClubRecords(records: List<ClubRecordEntity>)
 
     @Query("DELETE FROM club_records")
     suspend fun clearClubRecords()

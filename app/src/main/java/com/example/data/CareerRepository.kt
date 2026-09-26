@@ -1829,6 +1829,7 @@ class CareerRepository(private val context: Context, val slotId: Int = 1) {
      * End of Season Calculations.
      */
     private suspend fun handleEndOfSeason(player: PlayerEntity, gameState: GameStateEntity): String {
+        val usedNamesCache = dao.getAllUsedNamesSync().toMutableSet()
         // 1. Recalculate standings directly from this season's league fixtures to guarantee absolute score/points consistency
         val seasonFixtures = dao.getSeasonLeagueFixturesSync()
         val allStandings = dao.getAllStandingsSync()
@@ -2115,14 +2116,20 @@ class CareerRepository(private val context: Context, val slotId: Int = 1) {
             }
         }
 
+        val allClubRecords = dao.getAllClubRecordsSync().groupBy { it.clubId }
+        val modifiedClubRecords = mutableListOf<ClubRecordEntity>()
         for (club in allClubs) {
-            evolveClubRecords(club, gameState.currentSeason, trophyWinningClubIds.contains(club.id))
+            val clubRecs = allClubRecords[club.id] ?: emptyList()
+            modifiedClubRecords.addAll(evolveClubRecords(club, gameState.currentSeason, trophyWinningClubIds.contains(club.id), clubRecs, usedNamesCache))
+        }
+        if (modifiedClubRecords.isNotEmpty()) {
+            dao.updateClubRecords(modifiedClubRecords)
         }
 
         // Determine final tournament winners and runners-up for this season
         var clWinnerId: Int? = null
         var clRunnerUpId: Int? = null
-        val clFinalFx = dao.getAllFixturesSync().find { it.competition == "CHAMPIONS_LEAGUE" && it.round == 2 && it.isSimulated }
+        val clFinalFx = allFixturesSnapshot.find { it.competition == "CHAMPIONS_LEAGUE" && it.round == 2 && it.isSimulated }
         if (clFinalFx != null) {
             val isHomeWinner = (clFinalFx.homeScore ?: 0) > (clFinalFx.awayScore ?: 0) || 
                                ((clFinalFx.homeScore ?: 0) == (clFinalFx.awayScore ?: 0) && (clFinalFx.homePens ?: 0) > (clFinalFx.awayPens ?: 0))
@@ -2137,7 +2144,7 @@ class CareerRepository(private val context: Context, val slotId: Int = 1) {
 
         var elWinnerId: Int? = null
         var elRunnerUpId: Int? = null
-        val elFinalFx = dao.getAllFixturesSync().find { it.competition == "EUROPA_LEAGUE" && it.round == 2 && it.isSimulated }
+        val elFinalFx = allFixturesSnapshot.find { it.competition == "EUROPA_LEAGUE" && it.round == 2 && it.isSimulated }
         if (elFinalFx != null) {
             val isHomeWinner = (elFinalFx.homeScore ?: 0) > (elFinalFx.awayScore ?: 0) || 
                                ((elFinalFx.homeScore ?: 0) == (elFinalFx.awayScore ?: 0) && (elFinalFx.homePens ?: 0) > (elFinalFx.awayPens ?: 0))
@@ -2152,7 +2159,7 @@ class CareerRepository(private val context: Context, val slotId: Int = 1) {
 
         var confWinnerId: Int? = null
         var confRunnerUpId: Int? = null
-        val confFinalFx = dao.getAllFixturesSync().find { it.competition == "CONFERENCE_LEAGUE" && it.round == 2 && it.isSimulated }
+        val confFinalFx = allFixturesSnapshot.find { it.competition == "CONFERENCE_LEAGUE" && it.round == 2 && it.isSimulated }
         if (confFinalFx != null) {
             val isHomeWinner = (confFinalFx.homeScore ?: 0) > (confFinalFx.awayScore ?: 0) || 
                                ((confFinalFx.homeScore ?: 0) == (confFinalFx.awayScore ?: 0) && (confFinalFx.homePens ?: 0) > (confFinalFx.awayPens ?: 0))
@@ -2167,7 +2174,7 @@ class CareerRepository(private val context: Context, val slotId: Int = 1) {
 
         var superCupWinnerId: Int? = null
         var superCupRunnerUpId: Int? = null
-        val superCupFx = dao.getAllFixturesSync().find { it.competition == "SUPER_CUP" && it.isSimulated }
+        val superCupFx = allFixturesSnapshot.find { it.competition == "SUPER_CUP" && it.isSimulated }
         if (superCupFx != null) {
             val isHomeWinner = (superCupFx.homeScore ?: 0) > (superCupFx.awayScore ?: 0) || 
                                ((superCupFx.homeScore ?: 0) == (superCupFx.awayScore ?: 0) && (superCupFx.homePens ?: 0) > (superCupFx.awayPens ?: 0))
@@ -2195,7 +2202,7 @@ class CareerRepository(private val context: Context, val slotId: Int = 1) {
                     confWinnerId -> "Won UECL"
                     confRunnerUpId -> "Runner-Up UECL"
                     else -> {
-                        val fxList = dao.getAllFixturesSync()
+                        val fxList = allFixturesSnapshot
                         val semiCL = fxList.any { it.competition == "CHAMPIONS_LEAGUE" && it.round == 4 && (it.homeClubId == cId || it.awayClubId == cId) && it.isSimulated }
                         val qfCL = fxList.any { it.competition == "CHAMPIONS_LEAGUE" && it.round == 8 && (it.homeClubId == cId || it.awayClubId == cId) && it.isSimulated }
                         val semiEL = fxList.any { it.competition == "EUROPA_LEAGUE" && it.round == 4 && (it.homeClubId == cId || it.awayClubId == cId) && it.isSimulated }
@@ -2229,7 +2236,7 @@ class CareerRepository(private val context: Context, val slotId: Int = 1) {
         }
         dao.insertClubSeasonHistories(histories)
 
-        val playerSeasonFixturesSnapshot = dao.getAllFixturesSync().filter {
+        val playerSeasonFixturesSnapshot = allFixturesSnapshot.filter {
             it.isSimulated && (it.homeClubId == player.currentClubId || it.awayClubId == player.currentClubId)
         }
 
@@ -2255,7 +2262,7 @@ class CareerRepository(private val context: Context, val slotId: Int = 1) {
         dao.insertFixtures(fixtures)
 
         // Run living transfer window for NPC rival strikers and managers
-        runTransferWindow(allClubs, player, gameState, seasonLogs, histories)
+        runTransferWindow(allClubs, player, gameState, seasonLogs, histories, usedNamesCache)
 
         scheduleKnockoutTournament("CHAMPIONS_LEAGUE", clTeams)
         scheduleKnockoutTournament("EUROPA_LEAGUE", elTeams)
@@ -3435,7 +3442,8 @@ private suspend fun adjustClubsReputations(
         player: PlayerEntity,
         gameState: GameStateEntity,
         seasonLogs: MutableList<String>,
-        histories: List<ClubSeasonHistoryEntity>
+        histories: List<ClubSeasonHistoryEntity>,
+        usedNamesCache: MutableSet<String>? = null
     ) {
         val clubsMap = allClubs.associateBy { it.id }
         val finishPositionByClubId = histories.associate { it.clubId to it.leagueFinishPosition }
@@ -3478,7 +3486,7 @@ private suspend fun adjustClubsReputations(
                     val newAge = Random.nextInt(17, 20)
                     val newOvr = Random.nextInt(48, 62)
                     val newCeiling = newOvr + Random.nextInt(15, 30)
-                    val newName = generateUniqueName(oldClub.country, dao)
+                    val newName = generateUniqueName(oldClub.country, dao, usedNamesCache)
 
                     val newStriker = NpcStrikerEntity(
                         name = newName,
@@ -3538,7 +3546,7 @@ private suspend fun adjustClubsReputations(
                     val vacAge = Random.nextInt(17, 20)
                     val vacOvr = Random.nextInt(48, 62)
                     val vacCeiling = vacOvr + Random.nextInt(15, 30)
-                    val vacName = generateUniqueName(oldClub.country, dao)
+                    val vacName = generateUniqueName(oldClub.country, dao, usedNamesCache)
                     val vacStriker = NpcStrikerEntity(
                         name = vacName,
                         country = oldClub.country,
@@ -3649,7 +3657,7 @@ private suspend fun adjustClubsReputations(
                 club.rivalStrikerName = activeStriker.name
                 club.rivalStrikerOvr = activeStriker.ovr
             } else {
-                val fName = generateUniqueName(club.country, dao)
+                val fName = generateUniqueName(club.country, dao, usedNamesCache)
                 val fRange = FictionalData.getRivalOvrRange(club.reputation)
                 val fOvr = Random.nextInt(fRange.first, fRange.last + 1)
                 val fStriker = NpcStrikerEntity(
@@ -3729,7 +3737,7 @@ private suspend fun adjustClubsReputations(
 
                         // Old club needs replacement manager
                         if (prevClub != null) {
-                            val replacementName = generateUniqueName(prevClub.country, dao)
+                            val replacementName = generateUniqueName(prevClub.country, dao, usedNamesCache)
                             val repTier = if (Random.nextFloat() < 0.70f) prevClub.reputation else getNextLowerReputationTier(prevClub.reputation)
                             val replacementMgr = NpcManagerEntity(
                                 name = replacementName,
@@ -3749,7 +3757,7 @@ private suspend fun adjustClubsReputations(
                 }
 
                 if (!promoted) {
-                    appointedName = generateUniqueName(club.country, dao)
+                    appointedName = generateUniqueName(club.country, dao, usedNamesCache)
                     val repTier = if (Random.nextFloat() < 0.70f) club.reputation else getNextLowerReputationTier(club.reputation)
                     val freshMgr = NpcManagerEntity(
                         name = appointedName,
@@ -3810,7 +3818,7 @@ private suspend fun adjustClubsReputations(
                 club.managerReputationTier = activeMgr.reputationTier
                 club.managerId = activeMgr.id
             } else {
-                val mName = generateUniqueName(club.country, dao)
+                val mName = generateUniqueName(club.country, dao, usedNamesCache)
                 val mMgr = NpcManagerEntity(
                     name = mName,
                     country = club.country,
@@ -4188,6 +4196,7 @@ private suspend fun adjustClubsReputations(
 
     suspend fun resolveChoice(optionIndex: Int) {
         android.util.Log.d("ChoiceDebug", "resolveChoice entered with optionIndex=$optionIndex")
+        var isEndOfSeason = false
         db.withTransaction {
             val player = dao.getPlayerSync() ?: run {
                 android.util.Log.e("ChoiceDebug", "resolveChoice: player is null")
@@ -4348,12 +4357,7 @@ private suspend fun adjustClubsReputations(
                     }
                     dao.updateGameState(gameState)
                 } else {
-                    val endReport = handleEndOfSeason(player, gameState)
-                    gameState.narrativeLog = capNarrativeLog(endReport + "\n\n" + gameState.narrativeLog)
-                    gameState.currentSeason += 1
-                    gameState.currentMonthIndex = 0
-                    player.hasTransferredThisWindow = false
-                    dao.updatePlayer(player)
+                    isEndOfSeason = true
                     dao.updateGameState(gameState)
                 }
             } else {
@@ -4397,7 +4401,28 @@ private suspend fun adjustClubsReputations(
                 dao.updateGameState(gameState)
             }
         }
-        android.util.Log.d("ChoiceDebug", "resolveChoice: transaction completed successfully")
+        android.util.Log.d("ChoiceDebug", "resolveChoice: choice resolution committed successfully")
+
+        // Handle end of season transition outside choice transaction to avoid stuck save-lock
+        val latestPlayer = dao.getPlayerSync()
+        val latestGameState = dao.getGameStateSync()
+        if (isEndOfSeason && latestPlayer != null && latestGameState != null) {
+            try {
+                checkAndAwardYouthTrophy(latestPlayer, latestGameState)
+                resetYouthLeagueForNewSeason()
+                latestPlayer.age += 1
+                val endReport = handleEndOfSeason(latestPlayer, latestGameState)
+                latestGameState.narrativeLog = capNarrativeLog(endReport + "\n\n" + latestGameState.narrativeLog)
+                latestGameState.currentSeason += 1
+                latestGameState.currentMonthIndex = 0
+                latestPlayer.hasTransferredThisWindow = false
+                dao.updatePlayer(latestPlayer)
+                dao.updateGameState(latestGameState)
+                android.util.Log.d("ChoiceDebug", "resolveChoice: end of season rollover completed")
+            } catch (e: Exception) {
+                android.util.Log.e("ChoiceDebug", "resolveChoice: error during end of season rollover", e)
+            }
+        }
     }
 
     suspend fun getNextPlayerMatchInMonth(monthIndex: Int, playerClubId: Int): FixtureEntity? {
@@ -5128,6 +5153,9 @@ private suspend fun adjustClubsReputations(
                     }
                     dao.updateGameState(gameState)
                 } else {
+                    checkAndAwardYouthTrophy(player, gameState)
+                    resetYouthLeagueForNewSeason()
+                    player.age += 1
                     val endReport = handleEndOfSeason(player, gameState)
                     gameState.narrativeLog = capNarrativeLog(endReport + "\n\n" + gameState.narrativeLog)
                     gameState.currentSeason += 1
@@ -5142,7 +5170,7 @@ private suspend fun adjustClubsReputations(
     }
 
     // Unique name generation
-    suspend fun generateUniqueName(country: String, dao: CareerDao): String {
+    suspend fun generateUniqueName(country: String, dao: CareerDao, usedNamesCache: MutableSet<String>? = null): String {
         val blocklist = setOf(
             "Harry Kane", "Jude Bellingham", "Declan Rice",
             "Lamine Yamal", "Alvaro Morata", "Daniel Olmo", "Ferran Torres",
@@ -5154,8 +5182,13 @@ private suspend fun adjustClubsReputations(
         while (attempts < 200) {
             val candidate = FictionalData.generateRandomName(country)
             if (candidate !in blocklist) {
-                val count = dao.checkUsedNameCount(candidate)
-                if (count == 0) {
+                val isUsed = if (usedNamesCache != null) {
+                    candidate in usedNamesCache
+                } else {
+                    dao.checkUsedNameCount(candidate) > 0
+                }
+                if (!isUsed) {
+                    usedNamesCache?.add(candidate)
                     dao.insertUsedName(UsedNameEntity(candidate))
                     return candidate
                 }
@@ -5171,8 +5204,13 @@ private suspend fun adjustClubsReputations(
         while (fallbackSuffix <= 500) {
             val candidate = "$baseName $fallbackSuffix"
             if (candidate !in blocklist) {
-                val count = dao.checkUsedNameCount(candidate)
-                if (count == 0) {
+                val isUsed = if (usedNamesCache != null) {
+                    candidate in usedNamesCache
+                } else {
+                    dao.checkUsedNameCount(candidate) > 0
+                }
+                if (!isUsed) {
+                    usedNamesCache?.add(candidate)
                     dao.insertUsedName(UsedNameEntity(candidate))
                     return candidate
                 }
@@ -5181,6 +5219,7 @@ private suspend fun adjustClubsReputations(
         }
         // Absolute last resort — guarantees termination even in a pathological case.
         val fallbackCandidate = "$baseName ${System.currentTimeMillis()}"
+        usedNamesCache?.add(fallbackCandidate)
         dao.insertUsedName(UsedNameEntity(fallbackCandidate))
         return fallbackCandidate
     }
@@ -5264,7 +5303,13 @@ private suspend fun adjustClubsReputations(
     }
 
     // Record evolution
-    suspend fun evolveClubRecords(club: ClubEntity, currentSeason: Int, wonTrophyThisSeason: Boolean = false) {
+    suspend fun evolveClubRecords(
+        club: ClubEntity,
+        currentSeason: Int,
+        wonTrophyThisSeason: Boolean = false,
+        clubRecords: List<ClubRecordEntity>? = null,
+        usedNamesCache: MutableSet<String>? = null
+    ): List<ClubRecordEntity> {
         val chance = when (club.reputation) {
             "ELITE" -> 0.03f
             "BIG" -> 0.06f
@@ -5273,7 +5318,8 @@ private suspend fun adjustClubsReputations(
             else -> 0.10f
         }
 
-        val records = dao.getRecordsForClubSync(club.id)
+        val records = clubRecords ?: dao.getRecordsForClubSync(club.id)
+        val modifiedRecords = mutableListOf<ClubRecordEntity>()
         for (record in records) {
             if (record.category == "MOST_TROPHIES") {
                 // Gate MOST_TROPHIES evolution so it only fires if the club won a trophy this season
@@ -5282,7 +5328,7 @@ private suspend fun adjustClubsReputations(
                     record.previousStatValue = record.statValue
                     record.previousYearsActive = record.yearsActive
 
-                    val npcName = generateUniqueName(club.country, dao)
+                    val npcName = generateUniqueName(club.country, dao, usedNamesCache)
                     record.holderName = npcName
                     record.statValue = record.statValue + 1
                     record.isActive = true
@@ -5290,7 +5336,11 @@ private suspend fun adjustClubsReputations(
                     record.isUserPlayer = false
                     record.generation = null
 
-                    dao.updateClubRecord(record)
+                    if (clubRecords == null) {
+                        dao.updateClubRecord(record)
+                    } else {
+                        modifiedRecords.add(record)
+                    }
                 }
             } else if (kotlin.random.Random.nextFloat() < chance) {
                 val increment = when (record.category) {
@@ -5304,7 +5354,7 @@ private suspend fun adjustClubsReputations(
                 record.previousStatValue = record.statValue
                 record.previousYearsActive = record.yearsActive
 
-                val npcName = generateUniqueName(club.country, dao)
+                val npcName = generateUniqueName(club.country, dao, usedNamesCache)
                 record.holderName = npcName
                 record.statValue = record.statValue + increment
                 record.isActive = true
@@ -5312,9 +5362,14 @@ private suspend fun adjustClubsReputations(
                 record.isUserPlayer = false
                 record.generation = null
 
-                dao.updateClubRecord(record)
+                if (clubRecords == null) {
+                    dao.updateClubRecord(record)
+                } else {
+                    modifiedRecords.add(record)
+                }
             }
         }
+        return modifiedRecords
     }
 
     // Compare player stats against club records

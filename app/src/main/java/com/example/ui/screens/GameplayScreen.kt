@@ -39,7 +39,6 @@ import com.example.ui.dialogs.SettingsDialog
 import com.example.ui.dialogs.TransferOffersDialog
 import com.example.ui.tabs.*
 import com.example.ui.theme.*
-import com.example.ui.tutorial.tutorialTarget
 import com.example.ui.tutorial.TutorialOverlay
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -226,7 +225,6 @@ fun GameplayScreen(
                         ),
                         modifier = Modifier
                             .testTag("tab_${label.lowercase()}")
-                            .tutorialTarget(targetId)
                     )
                 }
             }
